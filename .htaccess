@@ -1,0 +1,27 @@
+# CVMatch IA - Configuration Apache
+Options -Indexes
+
+# Protéger les dossiers sensibles
+<FilesMatch "\.(log|sql|md|env)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Empêcher l'accès direct au dossier logs
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Bloquer accès direct aux logs
+    RewriteRule ^logs/ - [F,L]
+    RewriteRule ^includes/ - [F,L]
+
+    # Sécurité headers
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# Taille max upload (5 Mo)
+php_value upload_max_filesize 5M
+php_value post_max_size 6M
+php_value max_execution_time 60
