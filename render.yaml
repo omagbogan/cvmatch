@@ -27,6 +27,8 @@ services:
         fromDatabase:
           name: cvmatch-db
           property: password
+      - key: DB_ENGINE
+        value: "pgsql"
       - key: IA_SERVICE_URL
         value: "https://cvmatch-python.onrender.com"
 
@@ -41,7 +43,7 @@ services:
 
 databases:
   - name: cvmatch-db
-    engine: mysql
-    version: "8"
+    engine: postgres
+    version: "15"
     plan: starter
     databaseName: cvmatch_db

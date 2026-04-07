@@ -11,7 +11,14 @@ function env(string $key, $default = null) {
 
 function parseDatabaseUrl(string $url): array {
     $parsed = parse_url($url);
+    $scheme = $parsed['scheme'] ?? 'mysql';
+    $engine = match ($scheme) {
+        'postgres', 'postgresql' => 'pgsql',
+        'mysql' => 'mysql',
+        default => 'mysql',
+    };
     return [
+        'engine'   => $engine,
         'host'     => $parsed['host'] ?? 'localhost',
         'port'     => $parsed['port'] ?? null,
         'database' => ltrim($parsed['path'] ?? '', '/'),
@@ -32,12 +39,14 @@ ini_set('error_log', __DIR__ . '/logs/php-error.log');
 $databaseUrl = env('RAILWAY_DATABASE_URL', env('DATABASE_URL'));
 if ($databaseUrl) {
     $dbConfig = parseDatabaseUrl($databaseUrl);
+    define('DB_ENGINE', $dbConfig['engine'] ?? env('DB_ENGINE', 'mysql'));
     define('DB_HOST', $dbConfig['host']);
     define('DB_PORT', $dbConfig['port'] ?? null);
     define('DB_NAME', $dbConfig['database']);
     define('DB_USER', $dbConfig['user']);
     define('DB_PASS', $dbConfig['password']);
 } else {
+    define('DB_ENGINE', env('DB_ENGINE', 'mysql'));
     define('DB_HOST', env('DB_HOST', 'localhost'));
     define('DB_PORT', env('DB_PORT', null));
     define('DB_NAME', env('DB_NAME', 'cvmatch_db'));
@@ -82,10 +91,24 @@ function getDB(): PDO {
     static $pdo = null;
     if ($pdo === null) {
         try {
-            $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
-            if (defined('DB_PORT') && DB_PORT) {
-                $dsn .= ";port=" . DB_PORT;
+            $charset = DB_CHARSET;
+            if (DB_ENGINE === 'pgsql' && strcasecmp($charset, 'utf8mb4') === 0) {
+                $charset = 'UTF8';
             }
+
+            if (DB_ENGINE === 'pgsql') {
+                $dsn = "pgsql:host=" . DB_HOST . ";dbname=" . DB_NAME;
+                if (defined('DB_PORT') && DB_PORT) {
+                    $dsn .= ";port=" . DB_PORT;
+                }
+                $dsn .= ";options='--client_encoding=" . $charset . "'";
+            } else {
+                $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . $charset;
+                if (defined('DB_PORT') && DB_PORT) {
+                    $dsn .= ";port=" . DB_PORT;
+                }
+            }
+
             $options = [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,

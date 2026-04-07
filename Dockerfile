@@ -2,8 +2,8 @@ FROM php:8.2-apache
 
 # Installer les extensions PHP nécessaires
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libzip-dev zip unzip \
-    && docker-php-ext-install pdo_mysql \
+    && apt-get install -y --no-install-recommends libzip-dev zip unzip libpq-dev \
+    && docker-php-ext-install pdo_mysql pdo_pgsql \
     && a2dismod mpm_event mpm_worker || true \
     && rm -f /etc/apache2/mods-enabled/mpm*.load /etc/apache2/mods-enabled/mpm*.conf \
     && a2enmod mpm_prefork \
