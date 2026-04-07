@@ -3,6 +3,7 @@ services:
     name: cvmatch-web
     runtime: docker
     plan: starter
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /
     envVars:
       - key: APP_DEBUG
@@ -30,16 +31,11 @@ services:
       - key: DB_ENGINE
         value: "pgsql"
       - key: IA_SERVICE_URL
-        value: "https://cvmatch-python.onrender.com"
-
-  - type: web
-    name: cvmatch-python
-    runtime: docker
-    dockerfilePath: ./python-service/Dockerfile
-    plan: starter
-    envVars:
-      - key: PORT
-        value: "5000"
+        value: "http://localhost:5000"
+      - key: DEEPSEEK_API_URL
+        value: "https://api.deepseek.ai"
+      - key: DEEPSEEK_API_KEY
+        sync: false
 
 databases:
   - name: cvmatch-db
