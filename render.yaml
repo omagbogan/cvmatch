@@ -39,6 +39,6 @@ services:
 
 databases:
   - name: cvmatch-db
-    plan: starter
+    plan: basic-256mb
     postgresMajorVersion: "15"
     databaseName: cvmatch_db
