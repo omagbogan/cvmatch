@@ -33,18 +33,15 @@ services:
   - type: web
     name: cvmatch-python
     runtime: docker
+    dockerfilePath: ./python-service/Dockerfile
     plan: starter
-    buildCommand: "cd python-service && pip install -r requirements.txt"
-    startCommand: "cd python-service && python app.py"
     envVars:
-      - key: DEEPSEEK_API_KEY
-        sync: false
       - key: PORT
         value: "5000"
 
 databases:
   - name: cvmatch-db
-    plan: starter
-    databaseName: cvmatch_db
     engine: mysql
     version: "8"
+    plan: starter
+    databaseName: cvmatch_db
