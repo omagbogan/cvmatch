@@ -39,7 +39,6 @@ services:
 
 databases:
   - name: cvmatch-db
-    engine: postgres
-    version: "15"
     plan: starter
+    postgresMajorVersion: "15"
     databaseName: cvmatch_db
