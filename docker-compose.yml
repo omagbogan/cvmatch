@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+  db:
+    image: mariadb:11
+    container_name: cvmatch-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:-rootpassword}"
+      MYSQL_DATABASE: "${DB_NAME:-cvmatch_db}"
+      MYSQL_USER: "${DB_USER:-cvmatch}"
+      MYSQL_PASSWORD: "${DB_PASS:-changeme}"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cvmatch-web:latest
+    container_name: cvmatch-web
+    depends_on:
+      - db
+      - python
+    env_file:
+      - .env
+    ports:
+      - "80:80"
+    volumes:
+      - uploads:/var/www/html/uploads
+      - logs:/var/www/html/logs
+    restart: unless-stopped
+
+  python:
+    build:
+      context: ./python-service
+      dockerfile: Dockerfile
+    image: cvmatch-python:latest
+    container_name: cvmatch-python
+    env_file:
+      - .env
+    ports:
+      - "5000:5000"
+    volumes:
+      - uploads:/app/uploads
+      - cache:/app/cache
+    restart: unless-stopped
+
+volumes:
+  uploads:
+  logs:
+  cache:
+  db_data:

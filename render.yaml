@@ -1,0 +1,52 @@
+services:
+  - type: web
+    name: cvmatch-web
+    runtime: docker
+    plan: starter
+    healthCheckPath: /
+    envVars:
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_URL
+        fromService:
+          type: web
+          property: host
+      - key: DB_HOST
+        fromDatabase:
+          name: cvmatch-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: cvmatch-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: cvmatch-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: cvmatch-db
+          property: user
+      - key: DB_PASS
+        fromDatabase:
+          name: cvmatch-db
+          property: password
+      - key: IA_SERVICE_URL
+        value: "http://cvmatch-python:5000"
+
+  - type: private_service
+    name: cvmatch-python
+    runtime: docker
+    plan: starter
+    envVars:
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_URL
+        value: "https://api.deepseek.ai"
+      - key: PORT
+        value: "5000"
+
+databases:
+  - name: cvmatch-db
+    plan: starter
+    databaseName: cvmatch_db
