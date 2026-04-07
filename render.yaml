@@ -2,7 +2,6 @@ services:
   - type: web
     name: cvmatch-web
     runtime: docker
-    plan: starter
     dockerfilePath: ./Dockerfile
     healthCheckPath: /
     envVars:

@@ -14,9 +14,7 @@ WORKDIR /var/www/html
 
 # Copier les sources et garder les permissions
 COPY . /var/www/html/
-RUN mkdir -p uploads/cvs logs \
-    && chown -R www-data:www-data /var/www/html/uploads /var/www/html/logs /var/www/html \
-    && python3 -m pip install --no-cache-dir -r python-service/requirements.txt
+RUN mkdir -p uploads/cvs logs && chown -R www-data:www-data /var/www/html/uploads /var/www/html/logs /var/www/html && python3 -m pip install --no-cache-dir -r python-service/requirements.txt
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
