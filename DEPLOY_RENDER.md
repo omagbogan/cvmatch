@@ -103,7 +103,7 @@ Render efface les fichiers locaux à chaque redémarrage. Solution :
 - Pas de support des volumes persistants
 - Crédits limités par mois
 
-**Solution** : upgrade au plan **Starter** (~$7/mois) pour un usage en production.
+**Solution** : upgrade au plan **Standard** (~$25/mois) pour un usage en production. Le `render.yaml` est configuré pour utiliser les plans Standard.
 
 ---
 
