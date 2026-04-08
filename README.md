@@ -97,6 +97,36 @@ define('IA_SERVICE_URL', 'http://mon-serveur-python:5000');
 
 - Le service expose les mêmes endpoints que la version locale : `POST /match` et `POST /chat`.
 
+### Déploiement sur Railway
+
+Railway peut héberger :
+
+- le service Web PHP (`Dockerfile`)
+- le service Python (`python-service/Dockerfile`)
+- une base de données PostgreSQL gérée
+
+#### Étapes Railway
+
+1. Crée un projet Railway.
+2. Ajoute le plugin PostgreSQL ou MySQL.
+3. Crée un service Web en utilisant le `Dockerfile` à la racine.
+4. Crée un service Python en utilisant `python-service/Dockerfile`.
+5. Configure ces variables Railway :
+   - `RAILWAY_DATABASE_URL` ou `DATABASE_URL` (fourni par le plugin de base de données Railway)
+   - `APP_URL` = l'URL publique du service Web
+   - `IA_SERVICE_URL` = `http://<nom-du-service-python>:5000` si les deux services sont dans le même projet
+   - `DEEPSEEK_API_KEY` (optionnel)
+   - `DEEPSEEK_API_URL` = `https://api.deepseek.ai`
+
+#### Pourquoi ça fonctionne déjà
+
+`config.php` supporte déjà `RAILWAY_DATABASE_URL` et `DATABASE_URL`, donc Railway fournira directement les informations de connexion.
+
+#### Attention
+
+- Railway ne garantit pas la persistance locale des fichiers uploadés.
+- Pour les CVs, prévois un stockage externe ou un plugin de stockage.
+
 ### Format attendu de la réponse Python :
 ```json
 {

@@ -116,4 +116,16 @@ Render efface les fichiers locaux à chaque redémarrage. Solution :
 
 ---
 
+## Alternative : essayer Railway
+
+Si Render ne fonctionne pas pour ton projet, Railway est une bonne alternative pour déployer :
+
+- hébergement Docker simple
+- base PostgreSQL managée
+- variables d'environnement centralisées
+
+Tu peux déployer le service PHP et le service Python séparément, puis utiliser `RAILWAY_DATABASE_URL` et `IA_SERVICE_URL` pour la connexion.
+
+---
+
 **Besoin d'aide ?** Dis-moi quelle étape bloque !
