@@ -2,13 +2,14 @@
 /**
  * api-match.php
  * Pont entre le dashboard recruteur et le microservice Python Flask.
+ * Les candidats sont récupérés depuis MySQL et envoyés au Python.
  */
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/functions.php';
 
 requireRole('recruteur');
-set_time_limit(300); // ← ajoute cette ligne
+set_time_limit(300);
 
 header('Content-Type: application/json');
 
@@ -28,18 +29,30 @@ $mode    = trim($body['mode']    ?? 'match');
 
 $endpoint = ($mode === 'chat') ? '/chat' : '/match';
 
+// --- Récupération des candidats depuis MySQL ---
+$candidates = [];
+try {
+    $db   = getDB();
+    $stmt = $db->query(
+        "SELECT u.id, u.nom, u.email, u.telephone, u.ville,
+                c.competences_extraites, c.annees_experience, c.fichier_stocke, c.texte_extrait
+         FROM users u
+         LEFT JOIN cvs c ON c.user_id = u.id
+         WHERE u.role = 'candidat'"
+    );
+    $candidates = $stmt->fetchAll();
+} catch (Exception $e) {
+    error_log('[api-match] Erreur récupération candidats : ' . $e->getMessage());
+}
+
+// --- Construction du payload ---
 $payload = json_encode([
-    'requete' => $requete,
-    'filtre'  => $filtre,
-    'db_host' => DB_HOST,
-    'db_port' => defined('DB_PORT') && DB_PORT ? DB_PORT : 3306,
-    'db_user' => DB_USER,
-    'db_pass' => DB_PASS,
-    'db_name' => DB_NAME,
+    'requete'    => $requete,
+    'filtre'     => $filtre,
+    'candidates' => $candidates, // on envoie les candidats directement
 ]);
 
-// Forcer 127.0.0.1 pour éviter les problèmes DNS sous XAMPP
-$serviceUrl = str_replace('localhost', '127.0.0.1', rtrim(IA_SERVICE_URL, '/'));
+$serviceUrl = rtrim(IA_SERVICE_URL, '/');
 $url        = $serviceUrl . $endpoint;
 
 $ch = curl_init($url);
@@ -50,23 +63,21 @@ curl_setopt($ch, CURLOPT_HTTPHEADER, [
     'Content-Type: application/json',
     'Content-Length: ' . strlen($payload),
     'Accept: application/json',
-    'Expect:',  // désactive le 100-continue qui bloque cURL
+    'Expect:',
 ]);
 curl_setopt($ch, CURLOPT_TIMEOUT, (int) IA_SERVICE_TIMEOUT);
-curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 
 $response  = curl_exec($ch);
 $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 $curlError = curl_error($ch);
 curl_close($ch);
 
-// Erreur de connexion (Python non démarré)
+// Erreur de connexion
 if ($curlError || $response === false) {
-    http_response_code(503);
-    echo json_encode([
-        'error'  => 'Impossible de joindre le service IA Python. Vérifiez qu\'il est démarré sur ' . $url,
-        'detail' => $curlError,
-    ]);
+    // Fallback : scoring lexical PHP
+    $results = fallbackScoring($candidates, $requete, $filtre);
+    echo json_encode(['resultats' => $results, 'fallback' => true]);
     exit;
 }
 
@@ -81,9 +92,8 @@ if ($httpCode !== 200) {
     exit;
 }
 
-// Sauvegarder dans l'historique (non bloquant)
+// Sauvegarder dans l'historique
 try {
-    $db   = getDB();
     $user = getCurrentUser();
     $stmt = $db->prepare("INSERT INTO recherches (recruteur_id, requete, filtre, created_at) VALUES (?, ?, ?, NOW())");
     $stmt->execute([$user['id'], $requete, $filtre]);
@@ -92,3 +102,38 @@ try {
 }
 
 echo $response;
+
+// --- Fallback scoring lexical ---
+function fallbackScoring(array $candidates, string $requete, string $filtre): array {
+    $terms = array_filter(explode(' ', strtolower($requete . ' ' . $filtre)), fn($t) => strlen($t) > 2);
+    $results = [];
+    foreach ($candidates as $c) {
+        $content = strtolower(implode(' ', [
+            $c['nom'] ?? '',
+            $c['ville'] ?? '',
+            $c['competences_extraites'] ?? '',
+            $c['texte_extrait'] ?? '',
+        ]));
+        $matches = 0;
+        foreach ($terms as $term) {
+            if (str_contains($content, $term)) $matches++;
+        }
+        $score = count($terms) > 0 ? (int) round(($matches / count($terms)) * 100) : 0;
+        if ($score >= 30) {
+            $results[] = [
+                'id'                    => $c['id'],
+                'nom'                   => $c['nom'],
+                'email'                 => $c['email'],
+                'telephone'             => $c['telephone'],
+                'ville'                 => $c['ville'],
+                'score'                 => $score,
+                'annees_experience'     => (int)($c['annees_experience'] ?? 0),
+                'competences_extraites' => $c['competences_extraites'],
+                'cv_fichier'            => $c['fichier_stocke'],
+                'resume_ia'             => 'Score calculé par méthode lexicale.',
+            ];
+        }
+    }
+    usort($results, fn($a, $b) => $b['score'] - $a['score']);
+    return $results;
+}
