@@ -47,17 +47,17 @@ if ($databaseUrl) {
     define('DB_PASS', $dbConfig['password']);
 } else {
     define('DB_ENGINE', env('DB_ENGINE', 'mysql'));
-    define('DB_HOST', env('DB_HOST', 'localhost'));
+    define('DB_HOST', env('DB_HOST', 'sql102.infinityfree.com'));
     define('DB_PORT', env('DB_PORT', null));
-    define('DB_NAME', env('DB_NAME', 'cvmatch_db'));
-    define('DB_USER', env('DB_USER', 'root'));
-    define('DB_PASS', env('DB_PASS', ''));
+    define('DB_NAME', env('DB_NAME', 'if0_41619927_cvmatch_db'));
+    define('DB_USER', env('DB_USER', 'if0_41619927'));
+    define('DB_PASS', env('DB_PASS', 'MuI0tB7EMSYs6p'));
 }
 define('DB_CHARSET', env('DB_CHARSET', 'utf8mb4'));
 
 // --- Application ---
 define('APP_NAME', env('APP_NAME', 'CVMatch IA'));
-define('APP_URL', env('APP_URL', 'http://localhost/cvmatch'));
+define('APP_URL', env('APP_URL', 'http://cvmatch.rf.gd'));
 define('APP_VERSION', env('APP_VERSION', '1.0.0'));
 
 // --- Upload ---
