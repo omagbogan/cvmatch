@@ -9,44 +9,67 @@ if (isLoggedIn()) {
 
 $error = '';
 $success = '';
-$token = trim($_GET['token'] ?? '');
-$validToken = false;
 
-if (empty($token)) {
-    $error = 'Lien invalide ou expiré.';
-} else {
-    $db = getDB();
-    $stmt = $db->prepare("SELECT * FROM password_resets WHERE token = ? AND used = 0 AND expires_at > NOW()");
-    $stmt->execute([$token]);
-    $reset = $stmt->fetch();
-
-    if (!$reset) {
-        $error = 'Ce lien est invalide ou a expiré. Veuillez faire une nouvelle demande.';
-    } else {
-        $validToken = true;
-    }
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $validToken) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
         $error = 'Token de sécurité invalide.';
     } else {
-        $password = $_POST['password'] ?? '';
-        $confirm  = $_POST['confirm_password'] ?? '';
-
-        if (strlen($password) < 8) {
-            $error = 'Le mot de passe doit contenir au moins 8 caractères.';
-        } elseif ($password !== $confirm) {
-            $error = 'Les mots de passe ne correspondent pas.';
+        $email = trim($_POST['email'] ?? '');
+        if (empty($email) || !validateEmail($email)) {
+            $error = 'Veuillez entrer une adresse email valide.';
         } else {
-            $hash = password_hash($password, PASSWORD_BCRYPT);
-            $db->prepare("UPDATE users SET password_hash = ? WHERE email = ?")
-               ->execute([$hash, $reset['email']]);
-            $db->prepare("UPDATE password_resets SET used = 1 WHERE token = ?")
-               ->execute([$token]);
+            $db = getDB();
+            $stmt = $db->prepare("SELECT id, nom FROM users WHERE email = ?");
+            $stmt->execute([$email]);
+            $user = $stmt->fetch();
 
-            $success = 'Mot de passe mis à jour avec succès ! Vous pouvez maintenant vous connecter.';
-            $validToken = false;
+            if ($user) {
+                $token = bin2hex(random_bytes(32));
+                $expires = date('Y-m-d H:i:s', strtotime('+1 hour'));
+
+                $db->prepare("DELETE FROM password_resets WHERE email = ?")->execute([$email]);
+                $db->prepare("INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, ?)")
+                   ->execute([$email, $token, $expires]);
+
+                $resetLink = env('APP_URL') . '/reinitialiser-mot-de-passe.php?token=' . $token;
+
+                require_once __DIR__ . '/vendor/autoload.php';
+
+                $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+                try {
+                    $mail->isSMTP();
+                    $mail->Host       = env('MAIL_HOST', 'smtp.gmail.com');
+                    $mail->SMTPAuth   = true;
+                    $mail->Username   = env('MAIL_USERNAME');
+                    $mail->Password   = env('MAIL_PASSWORD');
+                    $mail->SMTPSecure = 'tls';
+                    $mail->Port       = 587;
+                    $mail->CharSet    = 'UTF-8';
+
+                    $mail->setFrom(env('MAIL_FROM'), env('MAIL_FROM_NAME', 'CVMatch'));
+                    $mail->addAddress($email, $user['nom']);
+                    $mail->Subject = 'Réinitialisation de votre mot de passe CVMatch';
+                    $mail->isHTML(true);
+                    $mail->Body = '
+                    <div style="font-family:Inter,sans-serif;max-width:500px;margin:auto;padding:30px;background:#f8fafc;border-radius:16px;">
+                        <h2 style="color:#3b82f6;">CVMatch IA</h2>
+                        <p>Bonjour <strong>' . htmlspecialchars($user['nom']) . '</strong>,</p>
+                        <p>Vous avez demandé la réinitialisation de votre mot de passe.</p>
+                        <p>Cliquez sur le bouton ci-dessous (valable 1 heure) :</p>
+                        <a href="' . $resetLink . '" style="display:inline-block;padding:14px 28px;background:#3b82f6;color:white;border-radius:10px;text-decoration:none;font-weight:600;margin:20px 0;">
+                            Réinitialiser mon mot de passe
+                        </a>
+                        <p style="color:#94a3b8;font-size:12px;">Si vous n\'avez pas demandé cette réinitialisation, ignorez cet email.</p>
+                    </div>';
+
+                    $mail->send();
+                    $success = 'Un email de réinitialisation a été envoyé à ' . htmlspecialchars($email) . '.';
+                } catch (Exception $e) {
+                    $error = 'Erreur lors de l\'envoi de l\'email. Veuillez réessayer.';
+                }
+            } else {
+                $success = 'Si cet email existe, un lien de réinitialisation a été envoyé.';
+            }
         }
     }
 }
@@ -56,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $validToken) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CVMatch IA - Réinitialiser le mot de passe</title>
+    <title>CVMatch IA - Mot de passe oublié</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
@@ -80,15 +103,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $validToken) {
         .message.success { background: #d1fae5; color: #059669; }
         .back-link { text-align: center; margin-bottom: 20px; }
         .back-link a { color: #64748b; text-decoration: none; font-size: 14px; }
-        .password-wrapper { position: relative; }
-        .toggle-password { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #94a3b8; background: none; border: none; font-size: 16px; }
     </style>
 </head>
 <body>
 <div class="card">
     <div class="back-link"><a href="connexion.php"><i class="fas fa-arrow-left"></i> Retour à la connexion</a></div>
     <div class="logo"><span>CV</span><span>Match IA</span></div>
-    <p class="subtitle">Choisissez un nouveau mot de passe.</p>
+    <p class="subtitle">Entrez votre email pour recevoir un lien de réinitialisation.</p>
 
     <?php if ($error): ?>
         <div class="message error"><i class="fas fa-exclamation-circle"></i> <?= clean($error) ?></div>
@@ -97,50 +118,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $validToken) {
         <div class="message success"><i class="fas fa-check-circle"></i> <?= clean($success) ?></div>
     <?php endif; ?>
 
-    <?php if ($validToken): ?>
+    <?php if (!$success): ?>
     <form method="POST">
         <?= csrfField() ?>
-        <input type="hidden" name="token" value="<?= clean($token) ?>">
         <div class="form-group">
-            <label for="password">Nouveau mot de passe</label>
-            <div class="password-wrapper">
-                <input type="password" id="password" name="password" placeholder="••••••••" required minlength="8">
-                <button type="button" class="toggle-password" onclick="togglePwd('password', 'eye1')">
-                    <i class="fas fa-eye" id="eye1"></i>
-                </button>
-            </div>
+            <label for="email">Adresse email</label>
+            <input type="email" id="email" name="email" placeholder="votre@email.com" required autocomplete="email">
         </div>
-        <div class="form-group">
-            <label for="confirm_password">Confirmer le mot de passe</label>
-            <div class="password-wrapper">
-                <input type="password" id="confirm_password" name="confirm_password" placeholder="••••••••" required minlength="8">
-                <button type="button" class="toggle-password" onclick="togglePwd('confirm_password', 'eye2')">
-                    <i class="fas fa-eye" id="eye2"></i>
-                </button>
-            </div>
-        </div>
-        <button type="submit" class="btn"><i class="fas fa-lock"></i> Réinitialiser le mot de passe</button>
+        <button type="submit" class="btn"><i class="fas fa-paper-plane"></i> Envoyer le lien</button>
     </form>
     <?php endif; ?>
 
-    <?php if ($success): ?>
-    <div class="footer"><a href="connexion.php">Se connecter maintenant</a></div>
-    <?php elseif (!$validToken && !$success): ?>
-    <div class="footer"><a href="mot-de-passe-oublie.php">Faire une nouvelle demande</a></div>
-    <?php endif; ?>
+    <div class="footer">
+        <a href="connexion.php">Se connecter</a> · <a href="inscription.php">S'inscrire</a>
+    </div>
 </div>
-<script>
-function togglePwd(fieldId, iconId) {
-    const input = document.getElementById(fieldId);
-    const icon = document.getElementById(iconId);
-    if (input.type === 'password') {
-        input.type = 'text';
-        icon.classList.replace('fa-eye', 'fa-eye-slash');
-    } else {
-        input.type = 'password';
-        icon.classList.replace('fa-eye-slash', 'fa-eye');
-    }
-}
-</script>
 </body>
 </html>
