@@ -145,6 +145,9 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
                     <i class="fas fa-robot"></i> Analyser avec l'IA
                 </button>
             </div>
+            <div id="analysisEstimate" style="margin-top:.75rem;font-size:.82rem;color:var(--gray-500);">
+                Estimation du temps d'analyse : environ 50 seconde(s).
+            </div>
 
             <!-- Filtres rapides -->
             <div class="filters-bar">
@@ -227,6 +230,7 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
 // ============================================
 let allResults = [];
 let currentFilter = '';
+const totalCvCount = <?= (int) $totalCvs ?>;
 
 // ============================================
 // Recherche IA via API PHP
@@ -239,9 +243,13 @@ async function rechercher() {
     }
 
     const btn = document.getElementById('searchBtn');
+    const estimateEl = document.getElementById('analysisEstimate');
+    const estimatedSeconds = estimerTempsAnalyse(totalCvCount);
+    const clientStartedAt = performance.now();
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Analyse en cours...';
-    document.getElementById('resultsContainer').innerHTML = '<div class="empty-state"><span class="spinner" style="border-color:rgba(59,130,246,.3);border-top-color:var(--primary);"></span><p style="margin-top:1rem;">L\'IA analyse les CV...</p></div>';
+    estimateEl.textContent = `Analyse en cours... temps estimé : environ ${estimatedSeconds} seconde(s).`;
+    document.getElementById('resultsContainer').innerHTML = '<div class="empty-state"><span class="spinner" style="border-color:rgba(59,130,246,.3);border-top-color:var(--primary);"></span><p style="margin-top:1rem;">L\'IA analyse les CV...</p><p style="margin-top:.5rem;font-size:.82rem;color:var(--gray-500);">Temps estimé : environ ' + estimatedSeconds + ' seconde(s).</p></div>';
 
     try {
         const response = await fetch('api-match.php', {
@@ -254,10 +262,19 @@ async function rechercher() {
 
         if (data.error) {
             afficherErreur(data.error);
+            estimateEl.textContent = 'Analyse interrompue avant la fin.';
         } else {
             allResults = data.resultats || [];
             afficherResultats(allResults);
             document.getElementById('sortSelect').disabled = false;
+            const elapsedMs = Math.round(performance.now() - clientStartedAt);
+            const serverMs = data.meta?.duration_ms || elapsedMs;
+            const estimated = data.meta?.estimated_seconds || estimatedSeconds;
+            const candidateCount = data.meta?.candidate_count;
+            const formatted = formaterDuree(serverMs);
+            estimateEl.textContent = candidateCount
+                ? `Analyse terminée en ${formatted} pour ${candidateCount} CV(s). Estimation initiale : ${estimated} seconde(s).`
+                : `Analyse terminée en ${formatted}. Estimation initiale : ${estimated} seconde(s).`;
 
             // Afficher l'agent IA si des résultats
             if (allResults.length > 0) {
@@ -266,6 +283,7 @@ async function rechercher() {
         }
     } catch (err) {
         afficherErreur('Erreur de communication avec le service IA. Vérifiez que le microservice Python est actif.');
+        estimateEl.textContent = 'Impossible d\'afficher le temps réel : le service IA n\'a pas répondu.';
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-robot"></i> Analyser avec l\'IA';
@@ -462,6 +480,15 @@ function escapeHtml(str) {
 
 function useSuggestion(el) {
     document.getElementById('searchQuery').value = el.textContent;
+}
+
+function estimerTempsAnalyse(totalCvs) {
+    return 50;
+}
+
+function formaterDuree(durationMs) {
+    const seconds = Math.max(1, Math.round(durationMs / 1000));
+    return seconds + ' seconde' + (seconds > 1 ? 's' : '');
 }
 
 // Fermer modal en cliquant dehors

@@ -1,8 +1,10 @@
 .env
+.venv/
 cache/
 logs/
 uploads/cvs/
 vendor/
 node_modules/
 __pycache__/
+python-service/__pycache__/
 *.pyc

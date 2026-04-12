@@ -12,6 +12,7 @@ requireRole('recruteur');
 set_time_limit(300);
 
 header('Content-Type: application/json');
+$requestStartedAt = microtime(true);
 
 // Lecture du body JSON envoyé par le dashboard
 $rawInput = file_get_contents('php://input');
@@ -52,6 +53,8 @@ $payload = json_encode([
     'candidates' => $candidates, // on envoie les candidats directement
 ]);
 
+$estimatedSeconds = estimateAnalysisSeconds(count($candidates));
+
 $serviceUrl = rtrim(IA_SERVICE_URL, '/');
 $url        = $serviceUrl . $endpoint;
 
@@ -77,7 +80,15 @@ curl_close($ch);
 if ($curlError || $response === false) {
     // Fallback : scoring lexical PHP
     $results = fallbackScoring($candidates, $requete, $filtre);
-    echo json_encode(['resultats' => $results, 'fallback' => true]);
+    echo json_encode([
+        'resultats' => $results,
+        'fallback' => true,
+        'meta' => [
+            'duration_ms' => elapsedMilliseconds($requestStartedAt),
+            'estimated_seconds' => $estimatedSeconds,
+            'candidate_count' => count($candidates),
+        ],
+    ]);
     exit;
 }
 
@@ -99,6 +110,17 @@ try {
     $stmt->execute([$user['id'], $requete, $filtre]);
 } catch (Exception $e) {
     error_log('[api-match] Sauvegarde historique échouée : ' . $e->getMessage());
+}
+
+$decodedResponse = json_decode($response, true);
+if (is_array($decodedResponse)) {
+    $decodedResponse['meta'] = array_merge($decodedResponse['meta'] ?? [], [
+        'duration_ms' => elapsedMilliseconds($requestStartedAt),
+        'estimated_seconds' => $estimatedSeconds,
+        'candidate_count' => count($candidates),
+    ]);
+    echo json_encode($decodedResponse);
+    exit;
 }
 
 echo $response;
@@ -136,4 +158,16 @@ function fallbackScoring(array $candidates, string $requete, string $filtre): ar
     }
     usort($results, fn($a, $b) => $b['score'] - $a['score']);
     return $results;
+}
+
+function estimateAnalysisSeconds(int $candidateCount): int {
+    if ($candidateCount <= 0) {
+        return 2;
+    }
+
+    return max(2, min(60, (int) ceil(2 + ($candidateCount / 4))));
+}
+
+function elapsedMilliseconds(float $startedAt): int {
+    return (int) round((microtime(true) - $startedAt) * 1000);
 }

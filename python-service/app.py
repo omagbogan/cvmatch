@@ -4,6 +4,8 @@ import re
 import json
 import hashlib
 import time
+import base64
+import tempfile
 import requests
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -26,6 +28,8 @@ load_dotenv()
 
 app = Flask(__name__)
 BASE_DIR   = Path(__file__).resolve().parent
+PROJECT_DIR = BASE_DIR.parent
+UPLOAD_DIR = Path(os.getenv('CV_UPLOAD_DIR', str(PROJECT_DIR / 'uploads' / 'cvs'))).resolve()
 CACHE_FILE = BASE_DIR / 'cache' / 'scores.json'
 CACHE_TTL  = 60 * 60 * 24  # 24 heures
 
@@ -86,6 +90,91 @@ def purge_expired_cache(cache: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Extraction de texte
+# ---------------------------------------------------------------------------
+
+def extract_text_from_file(filepath: Path) -> str:
+    ext = filepath.suffix.lower()
+    try:
+        if ext == '.pdf' and PDF_OK:
+            with pdfplumber.open(filepath) as pdf:
+                pages = [page.extract_text() or '' for page in pdf.pages]
+            return '\n'.join(pages).strip()
+
+        if ext == '.docx' and DOCX_OK:
+            doc = DocxDocument(filepath)
+            return '\n'.join(p.text for p in doc.paragraphs).strip()
+
+        if ext in ('.txt', '.md'):
+            return filepath.read_text(encoding='utf-8', errors='ignore').strip()
+
+    except Exception as e:
+        print(f'[extract] Erreur sur {filepath.name} : {e}')
+    return ''
+
+
+def scan_local_uploads() -> list[dict]:
+    supported_exts = {'.pdf', '.docx', '.txt', '.md'}
+    candidates = []
+
+    if not UPLOAD_DIR.exists():
+        print(f'[uploads] Dossier introuvable : {UPLOAD_DIR}')
+        return candidates
+
+    for filepath in sorted(UPLOAD_DIR.iterdir()):
+        if not filepath.is_file() or filepath.suffix.lower() not in supported_exts:
+            continue
+
+        texte = extract_text_from_file(filepath)
+        candidates.append({
+            'id': None,
+            'nom': filepath.stem.replace('_', ' ').replace('-', ' ').strip() or filepath.name,
+            'email': None,
+            'telephone': None,
+            'ville': None,
+            'competences_extraites': None,
+            'annees_experience': 0,
+            'fichier_stocke': filepath.name,
+            'texte_extrait': texte,
+        })
+
+    print(f'[uploads] {len(candidates)} CV(s) local(aux) charge(s) depuis {UPLOAD_DIR}')
+    return candidates
+
+
+def merge_candidates_with_local_uploads(candidates: list[dict], local_candidates: list[dict]) -> list[dict]:
+    local_by_file = {
+        str(candidate.get('fichier_stocke')): candidate
+        for candidate in local_candidates
+        if candidate.get('fichier_stocke')
+    }
+
+    merged_candidates = []
+    for candidate in candidates:
+        merged = dict(candidate)
+        local_candidate = local_by_file.get(str(candidate.get('fichier_stocke')))
+        if local_candidate:
+            if not merged.get('texte_extrait') and local_candidate.get('texte_extrait'):
+                merged['texte_extrait'] = local_candidate['texte_extrait']
+            if not merged.get('competences_extraites') and local_candidate.get('competences_extraites'):
+                merged['competences_extraites'] = local_candidate['competences_extraites']
+            if not merged.get('nom') and local_candidate.get('nom'):
+                merged['nom'] = local_candidate['nom']
+        merged_candidates.append(merged)
+
+    existing_files = {
+        str(candidate.get('fichier_stocke'))
+        for candidate in merged_candidates
+        if candidate.get('fichier_stocke')
+    }
+    for local_candidate in local_candidates:
+        if str(local_candidate.get('fichier_stocke')) not in existing_files:
+            merged_candidates.append(local_candidate)
+
+    return merged_candidates
+
+
+# ---------------------------------------------------------------------------
 # Normalisation
 # ---------------------------------------------------------------------------
 
@@ -115,11 +204,25 @@ Tu dois retourner UNIQUEMENT un objet JSON valide, sans aucun texte avant ou apr
 }
 
 Règles de scoring :
-- 90-100 : Profil quasi parfait
-- 70-89  : Très bon profil
-- 50-69  : Profil correct
-- 30-49  : Profil faible
-- 0-29   : Profil hors sujet
+- 90-100 : Profil quasi parfait, correspond à tous les critères essentiels
+- 70-89  : Très bon profil, correspond à la majorité des critères
+- 50-69  : Profil correct, correspondance partielle mais exploitable
+- 30-49  : Profil faible, peu de correspondance avec la recherche
+- 0-29   : Profil hors sujet ou données insuffisantes
+
+Critères d'évaluation (par ordre de priorité) :
+1. Compétences techniques ou métier en lien avec la requête
+2. Années d'expérience pertinente
+3. Localisation géographique si le filtre le précise
+4. Cohérence globale du profil avec le poste recherché
+
+Cas particuliers :
+- Profil vide ou sans données → score entre 0 et 15
+- Requête vague → évaluer sur les compétences générales
+- Filtre géographique non correspondant → pénaliser de 10 à 20 points max
+- Compétences proches mais pas exactes → score partiel, ne pas mettre 0
+- Tenir compte des synonymes (JS = JavaScript, PG = PostgreSQL)
+- Minimum absolu : 0
 
 Réponds UNIQUEMENT avec le JSON demandé.
 """.strip()
@@ -289,18 +392,18 @@ def score_candidate(candidate: dict, requete: str, filtre: str,
 
 @app.route('/match', methods=['POST'])
 def match():
-    data    = request.get_json(silent=True) or {}
-    requete = (data.get('requete') or '').strip()
-    filtre  = (data.get('filtre')  or '').strip()
-
-    # Candidats envoyés directement par le PHP
-    candidates = data.get('candidates', [])
+    data       = request.get_json(silent=True) or {}
+    requete    = (data.get('requete') or '').strip()
+    filtre     = (data.get('filtre')  or '').strip()
+    local_candidates = scan_local_uploads()
+    candidates = data.get('candidates', []) or []
+    candidates = merge_candidates_with_local_uploads(candidates, local_candidates)
 
     if not requete:
         return jsonify({'error': 'Requête manquante.'}), 400
 
     if not candidates:
-        return jsonify({'resultats': [], 'message': 'Aucun candidat reçu.'})
+        return jsonify({'resultats': [], 'message': 'Aucun candidat recu.'})
 
     cache = load_cache()
     cache = purge_expired_cache(cache)
@@ -336,6 +439,79 @@ def chat():
     return match()
 
 
+@app.route('/extract', methods=['POST'])
+def extract():
+    """
+    Reçoit un fichier en base64 depuis le PHP,
+    extrait le texte et retourne texte + compétences.
+    """
+    data     = request.get_json(silent=True) or {}
+    filename = data.get('filename', '')
+    mimetype = data.get('mimetype', '')
+    filedata = data.get('filedata', '')
+
+    if not filedata:
+        return jsonify({'error': 'Aucun fichier reçu.'}), 400
+
+    # Décoder le base64
+    try:
+        file_bytes = base64.b64decode(filedata)
+    except Exception as e:
+        return jsonify({'error': f'Décodage base64 échoué : {e}'}), 400
+
+    # Déterminer l'extension
+    ext = Path(filename).suffix.lower() if filename else ''
+    if not ext:
+        if 'pdf' in mimetype:
+            ext = '.pdf'
+        elif 'word' in mimetype or 'docx' in mimetype:
+            ext = '.docx'
+        else:
+            ext = '.txt'
+
+    # Écrire dans un fichier temporaire et extraire le texte
+    texte = ''
+    try:
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+            tmp.write(file_bytes)
+            tmp_path = Path(tmp.name)
+
+        texte = extract_text_from_file(tmp_path)
+        tmp_path.unlink(missing_ok=True)
+    except Exception as e:
+        print(f'[extract] Erreur extraction : {e}')
+
+    # Extraction basique des compétences
+    tech_keywords = [
+        'python', 'php', 'javascript', 'java', 'c++', 'c#', 'ruby', 'swift',
+        'react', 'vue', 'angular', 'node', 'django', 'flask', 'laravel',
+        'mysql', 'postgresql', 'mongodb', 'redis', 'docker', 'kubernetes',
+        'git', 'linux', 'aws', 'azure', 'gcp', 'html', 'css', 'sql',
+        'tensorflow', 'pytorch', 'machine learning', 'deep learning',
+        'excel', 'word', 'powerpoint', 'photoshop', 'illustrator',
+        'comptabilité', 'marketing', 'gestion', 'management', 'finance',
+        'communication', 'anglais', 'français', 'espagnol',
+    ]
+
+    texte_lower = texte.lower()
+    competences_trouvees = [kw for kw in tech_keywords if kw in texte_lower]
+    competences_str = ', '.join(competences_trouvees) if competences_trouvees else None
+
+    # Estimation années d'expérience
+    annees = 0
+    exp_matches = re.findall(r'(\d+)\s*(?:an|ans|année|années|year|years)', texte_lower)
+    if exp_matches:
+        annees = min(int(max(exp_matches, key=int)), 40)
+
+    print(f'[extract] ✅ {filename} — {len(texte)} caractères, compétences: {competences_str}')
+
+    return jsonify({
+        'texte':             texte[:5000],
+        'competences':       competences_str,
+        'annees_experience': annees,
+    })
+
+
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({
@@ -343,6 +519,8 @@ def health():
         'deepseek':  bool(DEEPSEEK_API_KEY),
         'pdf':       PDF_OK,
         'docx':      DOCX_OK,
+        'upload_dir': str(UPLOAD_DIR),
+        'upload_dir_exists': UPLOAD_DIR.exists(),
         'score_min': SCORE_MIN,
         'workers':   MAX_WORKERS,
     })
@@ -359,6 +537,7 @@ def clear_cache():
 
 
 if __name__ == '__main__':
+    print(f'📁 Upload dir   : {UPLOAD_DIR}')
     print(f'🤖 DeepSeek     : {"✅ Activé" if DEEPSEEK_API_KEY else "❌ Clé manquante — fallback lexical actif"}')
     print(f'📄 PDF support  : {"✅" if PDF_OK else "❌"}')
     print(f'📝 DOCX support : {"✅" if DOCX_OK else "❌"}')

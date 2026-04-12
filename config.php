@@ -1,30 +1,51 @@
 <?php
 // ============================================
 // CVMatch IA - Configuration globale
+// Standard: XAMPP local + Docker local + prod simple MySQL
 // ============================================
 
-// --- Environnement Railways / Déploiement ---
+function loadEnvFile(string $path): void {
+    if (!is_file($path) || !is_readable($path)) {
+        return;
+    }
+
+    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines === false) {
+        return;
+    }
+
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
+            continue;
+        }
+
+        [$key, $value] = explode('=', $line, 2);
+        $key = trim($key);
+        $value = trim($value);
+
+        if ($key === '' || getenv($key) !== false) {
+            continue;
+        }
+
+        if (
+            (str_starts_with($value, '"') && str_ends_with($value, '"')) ||
+            (str_starts_with($value, "'") && str_ends_with($value, "'"))
+        ) {
+            $value = substr($value, 1, -1);
+        }
+
+        putenv($key . '=' . $value);
+        $_ENV[$key] = $value;
+        $_SERVER[$key] = $value;
+    }
+}
+
+loadEnvFile(__DIR__ . '/.env');
+
 function env(string $key, $default = null) {
     $value = getenv($key);
     return $value !== false ? $value : $default;
-}
-
-function parseDatabaseUrl(string $url): array {
-    $parsed = parse_url($url);
-    $scheme = $parsed['scheme'] ?? 'mysql';
-    $engine = match ($scheme) {
-        'postgres', 'postgresql' => 'pgsql',
-        'mysql' => 'mysql',
-        default => 'mysql',
-    };
-    return [
-        'engine'   => $engine,
-        'host'     => $parsed['host'] ?? 'localhost',
-        'port'     => $parsed['port'] ?? null,
-        'database' => ltrim($parsed['path'] ?? '', '/'),
-        'user'     => $parsed['user'] ?? 'root',
-        'password' => $parsed['pass'] ?? '',
-    ];
 }
 
 define('APP_DEBUG', filter_var(env('APP_DEBUG', false), FILTER_VALIDATE_BOOLEAN));
@@ -36,28 +57,16 @@ if (APP_DEBUG) {
 ini_set('log_errors', '1');
 ini_set('error_log', __DIR__ . '/logs/php-error.log');
 
-$databaseUrl = env('RAILWAY_DATABASE_URL', env('DATABASE_URL'));
-if ($databaseUrl) {
-    $dbConfig = parseDatabaseUrl($databaseUrl);
-    define('DB_ENGINE', $dbConfig['engine'] ?? env('DB_ENGINE', 'mysql'));
-    define('DB_HOST', $dbConfig['host']);
-    define('DB_PORT', $dbConfig['port'] ?? null);
-    define('DB_NAME', $dbConfig['database']);
-    define('DB_USER', $dbConfig['user']);
-    define('DB_PASS', $dbConfig['password']);
-} else {
-    define('DB_ENGINE', env('DB_ENGINE', 'mysql'));
-    define('DB_HOST', env('DB_HOST', 'sql102.infinityfree.com'));
-    define('DB_PORT', env('DB_PORT', null));
-    define('DB_NAME', env('DB_NAME', 'if0_41619927_cvmatch_db'));
-    define('DB_USER', env('DB_USER', 'if0_41619927'));
-    define('DB_PASS', env('DB_PASS', 'MuI0tB7EMSYs6p'));
-}
+define('DB_HOST', env('DB_HOST', 'localhost'));
+define('DB_PORT', env('DB_PORT', 3306));
+define('DB_NAME', env('DB_NAME', 'cvmatch_db'));
+define('DB_USER', env('DB_USER', 'root'));
+define('DB_PASS', env('DB_PASS', ''));
 define('DB_CHARSET', env('DB_CHARSET', 'utf8mb4'));
 
 // --- Application ---
 define('APP_NAME', env('APP_NAME', 'CVMatch IA'));
-define('APP_URL', env('APP_URL', 'http://cvmatch.rf.gd'));
+define('APP_URL', env('APP_URL', 'http://localhost/cvmatch'));
 define('APP_VERSION', env('APP_VERSION', '1.0.0'));
 
 // --- Upload ---
@@ -72,7 +81,7 @@ define('IA_SERVICE_URL', env('IA_SERVICE_URL', 'http://localhost:5000'));  // UR
 define('IA_SERVICE_TIMEOUT', env('IA_SERVICE_TIMEOUT', 300));                  // Timeout en secondes
 
 // --- Service IA DeepSeek ---
-define('DEEPSEEK_API_URL', env('DEEPSEEK_API_URL', 'https://api.deepseek.ai'));
+define('DEEPSEEK_API_URL', env('DEEPSEEK_API_URL', 'https://api.deepseek.com'));
 define('DEEPSEEK_API_KEY', env('DEEPSEEK_API_KEY', ''));
 
 // --- Email (simulé - log fichier) ---
@@ -91,22 +100,9 @@ function getDB(): PDO {
     static $pdo = null;
     if ($pdo === null) {
         try {
-            $charset = DB_CHARSET;
-            if (DB_ENGINE === 'pgsql' && strcasecmp($charset, 'utf8mb4') === 0) {
-                $charset = 'UTF8';
-            }
-
-            if (DB_ENGINE === 'pgsql') {
-                $dsn = "pgsql:host=" . DB_HOST . ";dbname=" . DB_NAME;
-                if (defined('DB_PORT') && DB_PORT) {
-                    $dsn .= ";port=" . DB_PORT;
-                }
-                $dsn .= ";options='--client_encoding=" . $charset . "'";
-            } else {
-                $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . $charset;
-                if (defined('DB_PORT') && DB_PORT) {
-                    $dsn .= ";port=" . DB_PORT;
-                }
+            $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
+            if (defined('DB_PORT') && DB_PORT) {
+                $dsn .= ";port=" . DB_PORT;
             }
 
             $options = [
