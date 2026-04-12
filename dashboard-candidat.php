@@ -12,10 +12,10 @@ $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user['id']]);
 $profil = $stmt->fetch();
 
-// Récupérer le CV actuel
-$stmt = $db->prepare("SELECT * FROM cvs WHERE user_id = ? ORDER BY uploaded_at DESC LIMIT 1");
+$stmt = $db->prepare("SELECT * FROM cvs WHERE user_id = ? ORDER BY uploaded_at DESC");
 $stmt->execute([$user['id']]);
-$cv = $stmt->fetch();
+$cvs = $stmt->fetchAll();
+$cv = $cvs[0] ?? null; // le plus récent
 
 // Traitement de la mise à jour du profil (POST)
 $updateSuccess = '';
@@ -177,25 +177,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             <?php endif; ?>
         </div>
 
-        <?php if ($cv): ?>
-            <div class="cv-actuel">
-                <i class="fas fa-file-pdf" style="color:#ef4444;"></i>
-                <div class="cv-info">
-                    <strong><?= clean($cv['fichier_original']) ?></strong>
-                    <span><?= formatTaille($cv['taille_fichier']) ?> · Uploadé le <?= date('d/m/Y à H:i', strtotime($cv['uploaded_at'])) ?></span>
-                </div>
-                <span style="background:#d1fae5;color:#065f46;padding:.25rem .75rem;border-radius:20px;font-size:.75rem;font-weight:600;">
-                    <i class="fas fa-check"></i> Actif
-                </span>
-            </div>
+       <?php if (!empty($cvs)): ?>
+    <?php foreach ($cvs as $index => $cvItem): ?>
+    <div class="cv-actuel" style="margin-bottom:.5rem;">
+        <i class="fas fa-file-pdf" style="color:#ef4444;"></i>
+        <div class="cv-info">
+            <strong><?= clean($cvItem['fichier_original']) ?></strong>
+            <span><?= formatTaille($cvItem['taille_fichier']) ?> · Uploadé le <?= date('d/m/Y à H:i', strtotime($cvItem['uploaded_at'])) ?></span>
+        </div>
+        <?php if ($index === 0): ?>
+        <span style="background:#d1fae5;color:#065f46;padding:.25rem .75rem;border-radius:20px;font-size:.75rem;font-weight:600;">
+            <i class="fas fa-check"></i> Actif
+        </span>
         <?php endif; ?>
+        <a href="uploads/cvs/<?= clean($cvItem['fichier_stocke']) ?>" target="_blank" 
+           class="btn btn-outline" style="padding:.25rem .75rem;font-size:.75rem;">
+            <i class="fas fa-eye"></i>
+        </a>
+    </div>
+    <?php endforeach; ?>
+<?php endif; ?>
 
         <form method="POST" action="upload-cv.php" enctype="multipart/form-data" id="uploadForm">
             <?= csrfField() ?>
             <div class="upload-zone" id="uploadZone" onclick="document.getElementById('cvFile').click()">
                 <i class="fas fa-cloud-upload-alt"></i>
-                <p><?= $cv ? 'Remplacer mon CV' : 'Cliquez ou glissez votre CV ici' ?></p>
-                <small>PDF, DOCX, JPG, PNG · Maximum 5 Mo</small>
+                <p><?= !empty($cvs) ? 'Ajouter un autre CV' : 'Cliquez ou glissez votre CV ici' ?></p>                <small>PDF, DOCX, JPG, PNG · Maximum 5 Mo</small>
                 <input type="file" id="cvFile" name="cv_file" style="display:none"
                        accept=".pdf,.docx,.jpg,.jpeg,.png" onchange="previewFile(this)">
             </div>
@@ -227,7 +234,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:1rem;">
             <div style="text-align:center; padding:1rem; background:var(--gray-50); border-radius:12px;">
                 <div style="font-size:1.75rem; font-weight:800; color:var(--primary);">
-                    <?= $cv ? '1' : '0' ?>
+                    <?= count($cvs) ?>
                 </div>
                 <div style="font-size:.8rem; color:var(--gray-500); margin-top:.25rem;">CV soumis</div>
             </div>
