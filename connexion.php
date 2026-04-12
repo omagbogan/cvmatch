@@ -130,9 +130,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </button>
     </form>
 
-    <div class="footer">
-        Pas encore de compte ? <a href="inscription.php">S'inscrire</a>
-    </div>
+   <div class="footer">
+    <a href="mot-de-passe-oublie.php">Mot de passe oublié ?</a>
+</div>
+<div class="footer" style="margin-top:10px;">
+    Pas encore de compte ? <a href="inscription.php">S'inscrire</a>
+</div>
 
     <!-- Comptes de démo -->
     <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
