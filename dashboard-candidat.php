@@ -12,17 +12,17 @@ $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user['id']]);
 $profil = $stmt->fetch();
 
+// Récupérer tous les CVs
 $stmt = $db->prepare("SELECT * FROM cvs WHERE user_id = ? ORDER BY uploaded_at DESC");
 $stmt->execute([$user['id']]);
 $cvs = $stmt->fetchAll();
-$cv = $cvs[0] ?? null; // le plus récent
+$cv = $cvs[0] ?? null;
 
 // Traitement de la mise à jour du profil (POST)
 $updateSuccess = '';
 $updateError   = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
         $updateError = 'Token de sécurité invalide.';
     } elseif ($_POST['action'] === 'update_profil') {
@@ -37,7 +37,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $stmt->execute([$nom, $telephone, $ville, $user['id']]);
             $_SESSION['user_nom'] = $nom;
             $updateSuccess = 'Profil mis à jour avec succès !';
-            // Recharger le profil
             $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
             $stmt->execute([$user['id']]);
             $profil = $stmt->fetch();
@@ -56,7 +55,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f5f7fb; color: #1e293b; }
-        :root { --primary: #3b82f6; --primary-dark: #2563eb; --secondary: #8b5cf6; --success: #10b981; --gray-50: #f8fafc; --gray-100: #f1f5f9; --gray-200: #e2e8f0; --gray-300: #cbd5e1; --gray-500: #64748b; --gray-600: #475569; --gray-700: #334155; --gray-800: #1e293b; --radius: 16px; --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05); --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        :root {
+            --primary: #3b82f6; --primary-dark: #2563eb; --secondary: #8b5cf6;
+            --success: #10b981; --gray-50: #f8fafc; --gray-100: #f1f5f9;
+            --gray-200: #e2e8f0; --gray-300: #cbd5e1; --gray-500: #64748b;
+            --gray-600: #475569; --gray-700: #334155; --gray-800: #1e293b;
+            --radius: 16px; --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
         .navbar { background: white; box-shadow: var(--shadow-sm); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
         .logo { font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; background-clip: text; color: transparent; text-decoration: none; }
         .logo span { background: none; color: var(--gray-800); }
@@ -72,12 +78,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
         input:read-only { background: var(--gray-50); cursor: default; color: var(--gray-600); }
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        .btn { padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; font-family: inherit; font-size: 0.875rem; transition: all 0.2s; }
+        .btn { padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; font-family: inherit; font-size: 0.875rem; transition: all 0.2s; text-decoration: none; display: inline-flex; align-items: center; gap: .4rem; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-primary:hover { background: var(--primary-dark); }
         .btn-outline { background: transparent; border: 1px solid var(--gray-300); color: var(--gray-700); }
         .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
         .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
         .upload-zone { border: 2px dashed var(--gray-300); border-radius: var(--radius); padding: 2.5rem; text-align: center; cursor: pointer; background: var(--gray-50); margin-bottom: 1rem; transition: all 0.3s; }
         .upload-zone:hover, .upload-zone.dragover { border-color: var(--primary); background: #eff6ff; }
         .upload-zone i { font-size: 2rem; color: var(--primary); margin-bottom: 0.75rem; display: block; }
@@ -86,8 +93,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         .alert { padding: 0.875rem 1rem; border-radius: 10px; margin-bottom: 1rem; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem; }
         .alert-success { background: #d1fae5; color: #065f46; }
         .alert-error   { background: #fee2e2; color: #dc2626; }
-        .cv-actuel { background: var(--gray-50); border-radius: 10px; padding: 1rem; display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
-        .cv-actuel i { font-size: 1.5rem; }
+        .cv-actuel { background: var(--gray-50); border-radius: 10px; padding: 1rem; display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+        .cv-actuel i.cv-icon { font-size: 1.5rem; }
         .cv-info { flex: 1; }
         .cv-info strong { display: block; font-size: 0.875rem; }
         .cv-info span { font-size: 0.75rem; color: var(--gray-500); }
@@ -159,7 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 </div>
             </div>
 
-            <div id="saveBtn" style="display:none; text-align:right; gap:.5rem; display:none;">
+            <div id="saveBtn" style="display:none; text-align:right;">
                 <button type="button" class="btn btn-outline" onclick="cancelEdit()" style="margin-right:.5rem;">Annuler</button>
                 <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enregistrer</button>
             </div>
@@ -169,54 +176,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     <!-- Carte CV -->
     <div class="card">
         <div class="card-header">
-            <h2><i class="fas fa-file-alt" style="color:var(--primary);margin-right:.5rem;"></i> Mon CV</h2>
-            <?php if ($cv): ?>
-                <a href="uploads/cvs/<?= clean($cvItem['fichier_stocke']) ?>" target="_blank" 
-   class="btn btn-outline" style="padding:.25rem .75rem;font-size:.75rem;">
-    <i class="fas fa-eye"></i>
-</a>
-<form method="POST" action="supprimer-cv.php" style="display:inline;" 
-      onsubmit="return confirm('Supprimer ce CV ?');">
-    <?= csrfField() ?>
-    <input type="hidden" name="cv_id" value="<?= $cvItem['id'] ?>">
-    <button type="submit" class="btn btn-danger" style="padding:.25rem .75rem;font-size:.75rem;">
-        <i class="fas fa-trash"></i>
-    </button>
-</form>
+            <h2><i class="fas fa-file-alt" style="color:var(--primary);margin-right:.5rem;"></i> Mes CVs</h2>
+            <?php if (!empty($cvs)): ?>
+                <span style="font-size:.8rem;color:var(--gray-500);background:var(--gray-100);padding:.25rem .75rem;border-radius:20px;">
+                    <?= count($cvs) ?> CV(s) uploadé(s)
+                </span>
             <?php endif; ?>
         </div>
 
-       <?php if (!empty($cvs)): ?>
-    <?php foreach ($cvs as $index => $cvItem): ?>
-    <div class="cv-actuel" style="margin-bottom:.5rem;">
-        <i class="fas fa-file-pdf" style="color:#ef4444;"></i>
-        <div class="cv-info">
-            <strong><?= clean($cvItem['fichier_original']) ?></strong>
-            <span><?= formatTaille($cvItem['taille_fichier']) ?> · Uploadé le <?= date('d/m/Y à H:i', strtotime($cvItem['uploaded_at'])) ?></span>
-        </div>
-        <?php if ($index === 0): ?>
-        <span style="background:#d1fae5;color:#065f46;padding:.25rem .75rem;border-radius:20px;font-size:.75rem;font-weight:600;">
-            <i class="fas fa-check"></i> Actif
-        </span>
+        <?php if (!empty($cvs)): ?>
+            <?php foreach ($cvs as $index => $cvItem): ?>
+            <div class="cv-actuel">
+                <i class="fas fa-file-pdf cv-icon" style="color:#ef4444;"></i>
+                <div class="cv-info">
+                    <strong><?= clean($cvItem['fichier_original']) ?></strong>
+                    <span><?= formatTaille($cvItem['taille_fichier']) ?> · Uploadé le <?= date('d/m/Y à H:i', strtotime($cvItem['uploaded_at'])) ?></span>
+                </div>
+                <?php if ($index === 0): ?>
+                <span style="background:#d1fae5;color:#065f46;padding:.25rem .75rem;border-radius:20px;font-size:.75rem;font-weight:600;white-space:nowrap;">
+                    <i class="fas fa-check"></i> Actif
+                </span>
+                <?php endif; ?>
+                <a href="uploads/cvs/<?= clean($cvItem['fichier_stocke']) ?>" target="_blank"
+                   class="btn btn-outline" style="padding:.25rem .75rem;font-size:.75rem;">
+                    <i class="fas fa-eye"></i>
+                </a>
+                <form method="POST" action="supprimer-cv.php" style="display:inline;"
+                      onsubmit="return confirm('Supprimer ce CV ?');">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="cv_id" value="<?= $cvItem['id'] ?>">
+                    <button type="submit" class="btn btn-danger" style="padding:.25rem .75rem;font-size:.75rem;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
+            </div>
+            <?php endforeach; ?>
         <?php endif; ?>
-        <a href="uploads/cvs/<?= clean($cvItem['fichier_stocke']) ?>" target="_blank" 
-           class="btn btn-outline" style="padding:.25rem .75rem;font-size:.75rem;">
-            <i class="fas fa-eye"></i>
-        </a>
-    </div>
-    <?php endforeach; ?>
-<?php endif; ?>
 
-        <form method="POST" action="upload-cv.php" enctype="multipart/form-data" id="uploadForm">
+        <form method="POST" action="upload-cv.php" enctype="multipart/form-data" id="uploadForm" style="margin-top:1rem;">
             <?= csrfField() ?>
             <div class="upload-zone" id="uploadZone" onclick="document.getElementById('cvFile').click()">
                 <i class="fas fa-cloud-upload-alt"></i>
-                <p><?= !empty($cvs) ? 'Ajouter un autre CV' : 'Cliquez ou glissez votre CV ici' ?></p>                <small>PDF, DOCX, JPG, PNG · Maximum 5 Mo</small>
+                <p><?= !empty($cvs) ? 'Ajouter un autre CV' : 'Cliquez ou glissez votre CV ici' ?></p>
+                <small>PDF, DOCX, JPG, PNG · Maximum 5 Mo</small>
                 <input type="file" id="cvFile" name="cv_file" style="display:none"
                        accept=".pdf,.docx,.jpg,.jpeg,.png" onchange="previewFile(this)">
             </div>
 
-            <div id="filePreview" style="display:none; background:var(--gray-50); border-radius:10px; padding:1rem; margin-bottom:1rem; flex:true; gap:.75rem; align-items:center;">
+            <div id="filePreview" style="display:none; background:var(--gray-50); border-radius:10px; padding:1rem; margin-bottom:1rem; gap:.75rem; align-items:center;">
                 <i class="fas fa-file" style="font-size:1.5rem; color:var(--primary);"></i>
                 <div style="flex:1;">
                     <strong id="fileName" style="font-size:.875rem;display:block;"></strong>
@@ -232,14 +239,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             </div>
 
             <button type="submit" class="btn btn-primary" id="uploadBtn" style="width:100%;" disabled>
-                <i class="fas fa-upload"></i> Mettre à jour mon CV
+                <i class="fas fa-upload"></i> Uploader le CV
             </button>
         </form>
     </div>
 
     <!-- Statistiques rapides -->
     <div class="card">
-        <div class="card-header"><h2><i class="fas fa-chart-bar" style="color:var(--primary);margin-right:.5rem;"></i> Activité</h2></div>
+        <div class="card-header">
+            <h2><i class="fas fa-chart-bar" style="color:var(--primary);margin-right:.5rem;"></i> Activité</h2>
+        </div>
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:1rem;">
             <div style="text-align:center; padding:1rem; background:var(--gray-50); border-radius:12px;">
                 <div style="font-size:1.75rem; font-weight:800; color:var(--primary);">
@@ -258,7 +267,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             </div>
             <div style="text-align:center; padding:1rem; background:var(--gray-50); border-radius:12px;">
                 <div style="font-size:1.75rem; font-weight:800; color:var(--success);">
-                    <?= $cv ? '✓' : '—' ?>
+                    <?= !empty($cvs) ? '✓' : '—' ?>
                 </div>
                 <div style="font-size:.8rem; color:var(--gray-500); margin-top:.25rem;">Profil visible</div>
             </div>
@@ -316,10 +325,9 @@ function formatBytes(bytes) {
     return bytes + ' octets';
 }
 
-// Drag & Drop
 const zone = document.getElementById('uploadZone');
 zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
-zone.addEventListener('dragleave', ()=> zone.classList.remove('dragover'));
+zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
 zone.addEventListener('drop', e => {
     e.preventDefault();
     zone.classList.remove('dragover');
