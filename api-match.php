@@ -35,13 +35,15 @@ $candidates = [];
 try {
     $db   = getDB();
     $stmt = $db->query(
-        "SELECT u.id, u.nom, u.email, u.telephone, u.ville,
-                c.competences_extraites, c.annees_experience, c.fichier_stocke, c.texte_extrait
-         FROM users u
-         LEFT JOIN cvs c ON c.user_id = u.id
-         WHERE u.role = 'candidat'"
-    );
-    $candidates = $stmt->fetchAll();
+    "SELECT u.id, u.nom, u.email, u.telephone, u.ville,
+            c.id as cv_id, c.competences_extraites, c.annees_experience, 
+            c.fichier_stocke, c.texte_extrait, c.uploaded_at
+     FROM cvs c
+     JOIN users u ON u.id = c.user_id
+     WHERE u.role = 'candidat'
+     ORDER BY u.id, c.uploaded_at DESC"
+);
+$candidates = $stmt->fetchAll();
 } catch (Exception $e) {
     error_log('[api-match] Erreur récupération candidats : ' . $e->getMessage());
 }
