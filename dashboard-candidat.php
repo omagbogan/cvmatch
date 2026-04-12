@@ -171,9 +171,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         <div class="card-header">
             <h2><i class="fas fa-file-alt" style="color:var(--primary);margin-right:.5rem;"></i> Mon CV</h2>
             <?php if ($cv): ?>
-                <a href="uploads/cvs/<?= clean($cv['fichier_stocke']) ?>" target="_blank" class="btn btn-outline">
-                    <i class="fas fa-eye"></i> Voir mon CV
-                </a>
+                <a href="uploads/cvs/<?= clean($cvItem['fichier_stocke']) ?>" target="_blank" 
+   class="btn btn-outline" style="padding:.25rem .75rem;font-size:.75rem;">
+    <i class="fas fa-eye"></i>
+</a>
+<form method="POST" action="supprimer-cv.php" style="display:inline;" 
+      onsubmit="return confirm('Supprimer ce CV ?');">
+    <?= csrfField() ?>
+    <input type="hidden" name="cv_id" value="<?= $cvItem['id'] ?>">
+    <button type="submit" class="btn btn-danger" style="padding:.25rem .75rem;font-size:.75rem;">
+        <i class="fas fa-trash"></i>
+    </button>
+</form>
             <?php endif; ?>
         </div>
 
