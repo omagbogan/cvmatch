@@ -44,7 +44,7 @@ DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
 DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions'
 DEEPSEEK_MODEL   = 'deepseek-chat'
 
-SCORE_MIN   = 30
+SCORE_MIN   = 0
 MAX_WORKERS = 10
 
 
