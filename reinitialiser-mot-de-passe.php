@@ -19,7 +19,6 @@ if (empty($token)) {
     $stmt = $db->prepare("SELECT * FROM password_resets WHERE token = ? AND used = 0 AND expires_at > NOW()");
     $stmt->execute([$token]);
     $reset = $stmt->fetch();
-
     if (!$reset) {
         $error = 'Ce lien est invalide ou a expiré. Veuillez faire une nouvelle demande.';
     } else {
@@ -33,7 +32,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $validToken) {
     } else {
         $password = $_POST['password'] ?? '';
         $confirm  = $_POST['confirm_password'] ?? '';
-
         if (strlen($password) < 8) {
             $error = 'Le mot de passe doit contenir au moins 8 caractères.';
         } elseif ($password !== $confirm) {
@@ -44,7 +42,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $validToken) {
                ->execute([$hash, $reset['email']]);
             $db->prepare("UPDATE password_resets SET used = 1 WHERE token = ?")
                ->execute([$token]);
-
             $success = 'Mot de passe mis à jour avec succès ! Vous pouvez maintenant vous connecter.';
             $validToken = false;
         }
@@ -89,14 +86,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $validToken) {
     <div class="back-link"><a href="connexion.php"><i class="fas fa-arrow-left"></i> Retour à la connexion</a></div>
     <div class="logo"><span>CV</span><span>Match IA</span></div>
     <p class="subtitle">Choisissez un nouveau mot de passe.</p>
-
     <?php if ($error): ?>
         <div class="message error"><i class="fas fa-exclamation-circle"></i> <?= clean($error) ?></div>
     <?php endif; ?>
     <?php if ($success): ?>
         <div class="message success"><i class="fas fa-check-circle"></i> <?= clean($success) ?></div>
     <?php endif; ?>
-
     <?php if ($validToken): ?>
     <form method="POST">
         <?= csrfField() ?>
@@ -122,7 +117,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $validToken) {
         <button type="submit" class="btn"><i class="fas fa-lock"></i> Réinitialiser le mot de passe</button>
     </form>
     <?php endif; ?>
-
     <?php if ($success): ?>
     <div class="footer"><a href="connexion.php">Se connecter maintenant</a></div>
     <?php elseif (!$validToken && !$success): ?>
