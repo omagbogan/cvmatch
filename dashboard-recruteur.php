@@ -85,15 +85,106 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
         @keyframes spin { to { transform: rotate(360deg); } }
         .empty-state { text-align: center; padding: 3rem; color: var(--gray-500); }
         .empty-state i { font-size: 3rem; color: var(--gray-300); margin-bottom: 1rem; display: block; }
-        .ia-chat { background: var(--gray-50); border-radius: 12px; padding: 1rem; margin-top: 1rem; display: none; }
-        .ia-chat.visible { display: block; }
-        .chat-messages { max-height: 200px; overflow-y: auto; margin-bottom: 1rem; }
-        .chat-msg { padding: .75rem; border-radius: 10px; margin-bottom: .5rem; font-size: .875rem; }
-        .chat-msg.user { background: var(--primary); color: white; text-align: right; }
-        .chat-msg.ia   { background: white; border: 1px solid var(--gray-200); }
-        .chat-input-row { display: flex; gap: .5rem; }
-        .chat-input { flex: 1; padding: .75rem; border: 1px solid var(--gray-200); border-radius: 10px; font-family: inherit; font-size: .875rem; }
-        @media (max-width: 768px) { .candidate-card { flex-direction: column; } .container { padding: 1rem; } }
+
+        /* ====== CHAT FLOTTANT IA ====== */
+        #chatFloatBtn {
+            position: fixed; bottom: 2rem; right: 2rem;
+            width: 60px; height: 60px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 50%; border: none; cursor: pointer;
+            box-shadow: 0 8px 25px rgba(59,130,246,.4);
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 1.4rem; z-index: 9999;
+            transition: transform .2s, box-shadow .2s;
+        }
+        #chatFloatBtn:hover { transform: scale(1.1); box-shadow: 0 12px 30px rgba(59,130,246,.5); }
+        #chatFloatBtn .badge {
+            position: absolute; top: -4px; right: -4px;
+            background: #ef4444; color: white; border-radius: 50%;
+            width: 20px; height: 20px; font-size: .65rem;
+            display: none; align-items: center; justify-content: center; font-weight: 700;
+        }
+        #chatFloatWindow {
+            position: fixed; bottom: 6rem; right: 2rem;
+            width: 380px; max-height: 520px;
+            background: white; border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,.15);
+            display: none; flex-direction: column; z-index: 9998;
+            overflow: hidden; border: 1px solid var(--gray-200);
+        }
+        #chatFloatWindow.open { display: flex; }
+        .chat-float-header {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            padding: 1rem 1.25rem; color: white;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .agent-info { display: flex; align-items: center; gap: .75rem; }
+        .agent-avatar {
+            width: 36px; height: 36px; background: rgba(255,255,255,.2);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem;
+        }
+        .agent-name { font-weight: 700; font-size: .95rem; }
+        .agent-status { font-size: .72rem; opacity: .85; }
+        .chat-float-close { background: none; border: none; color: white; cursor: pointer; font-size: 1.1rem; opacity: .8; }
+        .chat-float-close:hover { opacity: 1; }
+        .chat-float-messages {
+            flex: 1; overflow-y: auto; padding: 1rem;
+            display: flex; flex-direction: column; gap: .75rem; background: var(--gray-50);
+        }
+        .float-msg { display: flex; gap: .5rem; align-items: flex-end; }
+        .float-msg.user { flex-direction: row-reverse; }
+        .float-msg-avatar {
+            width: 28px; height: 28px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: .7rem; font-weight: 700; flex-shrink: 0;
+        }
+        .float-msg.ia .float-msg-avatar { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; }
+        .float-msg.user .float-msg-avatar { background: var(--gray-200); color: var(--gray-700); }
+        .float-msg-bubble {
+            max-width: 75%; padding: .65rem .9rem;
+            border-radius: 14px; font-size: .82rem; line-height: 1.5;
+        }
+        .float-msg.ia .float-msg-bubble { background: white; border: 1px solid var(--gray-200); color: var(--gray-800); border-bottom-left-radius: 4px; }
+        .float-msg.user .float-msg-bubble { background: var(--primary); color: white; border-bottom-right-radius: 4px; }
+        .typing-indicator { display: flex; gap: 4px; padding: .65rem .9rem; }
+        .typing-indicator span { width: 7px; height: 7px; background: var(--gray-400); border-radius: 50%; animation: bounce 1.2s infinite; }
+        .typing-indicator span:nth-child(2) { animation-delay: .2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: .4s; }
+        @keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+        .chat-float-suggestions {
+            padding: .5rem 1rem; display: flex; gap: .4rem; flex-wrap: wrap;
+            border-top: 1px solid var(--gray-100); background: white;
+        }
+        .chat-suggestion-chip {
+            padding: .3rem .7rem; background: var(--gray-100);
+            border-radius: 20px; font-size: .7rem; cursor: pointer;
+            border: none; font-family: inherit; color: var(--gray-700); transition: all .15s;
+        }
+        .chat-suggestion-chip:hover { background: var(--primary); color: white; }
+        .chat-float-footer {
+            padding: .75rem 1rem; border-top: 1px solid var(--gray-200);
+            display: flex; gap: .5rem; background: white;
+        }
+        .chat-float-input {
+            flex: 1; padding: .65rem .9rem;
+            border: 1px solid var(--gray-200); border-radius: 20px;
+            font-family: inherit; font-size: .82rem; transition: border-color .2s;
+        }
+        .chat-float-input:focus { outline: none; border-color: var(--primary); }
+        .chat-float-send {
+            width: 36px; height: 36px; background: var(--primary);
+            border: none; border-radius: 50%; color: white; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: .85rem; transition: background .2s; flex-shrink: 0;
+        }
+        .chat-float-send:hover { background: var(--primary-dark); }
+        .chat-float-send:disabled { opacity: .5; cursor: not-allowed; }
+
+        @media (max-width: 768px) {
+            .candidate-card { flex-direction: column; }
+            .container { padding: 1rem; }
+            #chatFloatWindow { width: calc(100vw - 2rem); right: 1rem; }
+        }
     </style>
 </head>
 <body>
@@ -186,19 +277,6 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
         </div>
     </div>
 
-    <!-- Agent IA conversationnel -->
-    <div class="ia-chat" id="iaChat">
-        <div style="font-weight:600;font-size:.875rem;margin-bottom:.75rem;">
-            <i class="fas fa-robot" style="color:var(--primary);"></i> Agent IA — Affinez votre recherche
-        </div>
-        <div class="chat-messages" id="chatMessages">
-            <div class="chat-msg ia">Bonjour ! Vous pouvez me demander d'affiner les résultats. Par exemple : "Montre-moi seulement les femmes", "Ceux avec plus de 3 ans d'expérience", "Uniquement les profils d'Abidjan"...</div>
-        </div>
-        <div class="chat-input-row">
-            <input type="text" id="chatInput" class="chat-input" placeholder="Affinez votre recherche..." onkeypress="if(event.key==='Enter')envoyerChat()">
-            <button class="btn btn-primary" onclick="envoyerChat()"><i class="fas fa-paper-plane"></i></button>
-        </div>
-    </div>
 </div>
 
 <!-- Modal Contact -->
@@ -224,12 +302,62 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
     </div>
 </div>
 
+<!-- ====== BOUTON CHAT FLOTTANT ====== -->
+<button id="chatFloatBtn" onclick="toggleChatFloat()" title="Agent IA - Affinez votre recherche">
+    <i class="fas fa-robot"></i>
+    <span class="badge" id="chatBadge">1</span>
+</button>
+
+<!-- ====== FENÊTRE CHAT FLOTTANT ====== -->
+<div id="chatFloatWindow">
+    <div class="chat-float-header">
+        <div class="agent-info">
+            <div class="agent-avatar">🤖</div>
+            <div>
+                <div class="agent-name">Agent IA CVMatch</div>
+                <div class="agent-status">● En ligne · Propulsé par DeepSeek</div>
+            </div>
+        </div>
+        <button class="chat-float-close" onclick="toggleChatFloat()">✕</button>
+    </div>
+
+    <div class="chat-float-messages" id="floatMessages">
+        <div class="float-msg ia">
+            <div class="float-msg-avatar">🤖</div>
+            <div class="float-msg-bubble">
+                Bonjour ! Je suis votre assistant de recrutement IA.<br><br>
+                Faites d'abord une recherche, puis demandez-moi d'affiner. Par exemple :<br>
+                <em>"Seulement ceux avec +3 ans d'expérience"</em><br>
+                <em>"Score supérieur à 80%"</em><br>
+                <em>"Basé à Abidjan"</em>
+            </div>
+        </div>
+    </div>
+
+    <div class="chat-float-suggestions">
+        <button class="chat-suggestion-chip" onclick="useChip(this)">Score > 80%</button>
+        <button class="chat-suggestion-chip" onclick="useChip(this)">+5 ans d'exp.</button>
+        <button class="chat-suggestion-chip" onclick="useChip(this)">Basé à Abidjan</button>
+        <button class="chat-suggestion-chip" onclick="useChip(this)">Trier par score</button>
+    </div>
+
+    <div class="chat-float-footer">
+        <input type="text" id="floatInput" class="chat-float-input"
+            placeholder="Affinez votre recherche..."
+            onkeypress="if(event.key==='Enter')envoyerFloatChat()">
+        <button class="chat-float-send" id="floatSendBtn" onclick="envoyerFloatChat()">
+            <i class="fas fa-paper-plane"></i>
+        </button>
+    </div>
+</div>
+
 <script>
 // ============================================
 // Variables globales
 // ============================================
-let allResults = [];
+let allResults    = [];
 let currentFilter = '';
+let floatHistorique = [];
 const totalCvCount = <?= (int) $totalCvs ?>;
 
 // ============================================
@@ -237,15 +365,13 @@ const totalCvCount = <?= (int) $totalCvs ?>;
 // ============================================
 async function rechercher() {
     const query = document.getElementById('searchQuery').value.trim();
-    if (!query) {
-        alert('Veuillez entrer une requête de recherche.');
-        return;
-    }
+    if (!query) { alert('Veuillez entrer une requête de recherche.'); return; }
 
     const btn = document.getElementById('searchBtn');
     const estimateEl = document.getElementById('analysisEstimate');
     const estimatedSeconds = estimerTempsAnalyse(totalCvCount);
     const clientStartedAt = performance.now();
+
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Analyse en cours...';
     estimateEl.textContent = `Analyse en cours... temps estimé : environ ${estimatedSeconds} seconde(s).`;
@@ -257,7 +383,6 @@ async function rechercher() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ requete: query })
         });
-
         const data = await response.json();
 
         if (data.error) {
@@ -267,18 +392,22 @@ async function rechercher() {
             allResults = data.resultats || [];
             afficherResultats(allResults);
             document.getElementById('sortSelect').disabled = false;
+
             const elapsedMs = Math.round(performance.now() - clientStartedAt);
-            const serverMs = data.meta?.duration_ms || elapsedMs;
+            const serverMs  = data.meta?.duration_ms || elapsedMs;
             const estimated = data.meta?.estimated_seconds || estimatedSeconds;
             const candidateCount = data.meta?.candidate_count;
             const formatted = formaterDuree(serverMs);
+
             estimateEl.textContent = candidateCount
                 ? `Analyse terminée en ${formatted} pour ${candidateCount} CV(s). Estimation initiale : ${estimated} seconde(s).`
                 : `Analyse terminée en ${formatted}. Estimation initiale : ${estimated} seconde(s).`;
 
-            // Afficher l'agent IA si des résultats
+            // Ouvrir le chat flottant automatiquement si des résultats
             if (allResults.length > 0) {
-                document.getElementById('iaChat').classList.add('visible');
+                setTimeout(() => {
+                    document.getElementById('chatBadge').style.display = 'flex';
+                }, 500);
             }
         }
     } catch (err) {
@@ -295,7 +424,7 @@ async function rechercher() {
 // ============================================
 function afficherResultats(resultats) {
     const container = document.getElementById('resultsContainer');
-    const count = document.getElementById('resultsCount');
+    const count     = document.getElementById('resultsCount');
 
     if (!resultats || resultats.length === 0) {
         container.innerHTML = '<div class="empty-state"><i class="fas fa-user-slash"></i><p>Aucun candidat trouvé pour cette recherche.<br>Essayez des termes plus généraux.</p></div>';
@@ -306,7 +435,7 @@ function afficherResultats(resultats) {
     count.textContent = resultats.length + ' candidat' + (resultats.length > 1 ? 's' : '') + ' trouvé' + (resultats.length > 1 ? 's' : '');
 
     container.innerHTML = resultats.map(c => `
-        <div class="candidate-card" data-score="${c.score}" data-ville="${(c.ville||'').toLowerCase()}" data-experience="${c.annees_experience||0}">
+        <div class="candidate-card">
             <div class="candidate-avatar">${getInitiales(c.nom)}</div>
             <div class="candidate-info">
                 <div style="display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;">
@@ -318,14 +447,11 @@ function afficherResultats(resultats) {
                     ${c.email} · ${c.telephone || 'Tel non renseigné'}
                     ${c.annees_experience ? ` · ${c.annees_experience} an(s) d'expérience` : ''}
                 </div>
-
                 ${c.competences_extraites ? `
                 <div class="skills-list">
                     ${c.competences_extraites.split(',').slice(0,6).map(s => `<span class="skill-tag">${escapeHtml(s.trim())}</span>`).join('')}
                 </div>` : ''}
-
                 ${c.resume_ia ? `<div class="ai-summary"><i class="fas fa-robot" style="color:var(--primary);margin-right:.4rem;"></i>${escapeHtml(c.resume_ia)}</div>` : ''}
-
                 <div style="display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap;">
                     ${c.cv_fichier ? `<a href="uploads/cvs/${escapeHtml(c.cv_fichier)}" target="_blank" class="btn btn-outline"><i class="fas fa-file-alt"></i> Voir CV</a>` : '<span class="btn btn-outline" style="opacity:.5;cursor:default;">Pas de CV</span>'}
                     <button class="btn btn-primary" onclick="openModal(${c.id}, '${escapeHtml(c.nom)}', '${escapeHtml(c.email)}')">
@@ -365,7 +491,7 @@ function appliquerFiltre() {
 }
 
 function trierResultats() {
-    const sort = document.getElementById('sortSelect').value;
+    const sort   = document.getElementById('sortSelect').value;
     const sorted = [...allResults].sort((a, b) => {
         if (sort === 'score')      return b.score - a.score;
         if (sort === 'name')       return a.nom.localeCompare(b.nom);
@@ -376,56 +502,108 @@ function trierResultats() {
 }
 
 // ============================================
-// Agent IA conversationnel
+// CHAT FLOTTANT — Agent IA DeepSeek (port 5001)
 // ============================================
-async function envoyerChat() {
-    const input = document.getElementById('chatInput');
-    const msg = input.value.trim();
-    if (!msg) return;
-
-    ajouterMessage(msg, 'user');
-    input.value = '';
-
-    const query = document.getElementById('searchQuery').value.trim();
-
-    try {
-        const response = await fetch('api-match.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ requete: query, filtre: msg, mode: 'chat' })
-        });
-        const data = await response.json();
-
-        if (data.resultats) {
-            allResults = data.resultats;
-            afficherResultats(allResults);
-            ajouterMessage(`J'ai trouvé ${data.resultats.length} profil(s) correspondant à votre affinage.`, 'ia');
-        }
-        if (data.message) {
-            ajouterMessage(data.message, 'ia');
-        }
-    } catch (e) {
-        ajouterMessage('Erreur de communication avec le service IA.', 'ia');
-    }
+function toggleChatFloat() {
+    const win = document.getElementById('chatFloatWindow');
+    win.classList.toggle('open');
+    document.getElementById('chatBadge').style.display = 'none';
 }
 
-function ajouterMessage(texte, type) {
-    const container = document.getElementById('chatMessages');
+function useChip(el) {
+    document.getElementById('floatInput').value = el.textContent;
+    envoyerFloatChat();
+}
+
+function addFloatMsg(texte, type) {
+    const container = document.getElementById('floatMessages');
     const div = document.createElement('div');
-    div.className = `chat-msg ${type}`;
-    div.textContent = texte;
+    div.className = `float-msg ${type}`;
+    div.innerHTML = `
+        <div class="float-msg-avatar">${type === 'ia' ? '🤖' : '👤'}</div>
+        <div class="float-msg-bubble">${texte}</div>
+    `;
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
+}
+
+function showTyping() {
+    const container = document.getElementById('floatMessages');
+    const div = document.createElement('div');
+    div.className = 'float-msg ia';
+    div.id = 'typingEl';
+    div.innerHTML = `
+        <div class="float-msg-avatar">🤖</div>
+        <div class="float-msg-bubble typing-indicator"><span></span><span></span><span></span></div>
+    `;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+function removeTyping() {
+    const el = document.getElementById('typingEl');
+    if (el) el.remove();
+}
+
+async function envoyerFloatChat() {
+    const input = document.getElementById('floatInput');
+    const msg   = input.value.trim();
+    if (!msg) return;
+
+    if (allResults.length === 0) {
+        addFloatMsg("Veuillez d'abord lancer une recherche IA, puis je pourrai affiner les résultats pour vous.", 'ia');
+        input.value = '';
+        return;
+    }
+
+    input.value = '';
+    addFloatMsg(msg, 'user');
+    floatHistorique.push({ role: 'user', content: msg });
+
+    const sendBtn = document.getElementById('floatSendBtn');
+    sendBtn.disabled = true;
+    showTyping();
+
+    try {
+        const response = await fetch('api-agent.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message:           msg,
+                requete_initiale:  document.getElementById('searchQuery').value.trim(),
+                candidats:         allResults,
+                historique:        floatHistorique
+            })
+        });
+
+        const data = await response.json();
+        removeTyping();
+
+        if (data.resultats !== undefined) {
+            allResults = data.resultats;
+            afficherResultats(allResults);
+        }
+
+        const reponse = data.message || 'Résultats mis à jour.';
+        addFloatMsg(reponse, 'ia');
+        floatHistorique.push({ role: 'assistant', content: reponse });
+
+    } catch (e) {
+        removeTyping();
+        addFloatMsg('Erreur de communication avec le service agent IA.', 'ia');
+    }
+
+    sendBtn.disabled = false;
 }
 
 // ============================================
 // Modal Contact
 // ============================================
 function openModal(candidatId, nom, email) {
-    document.getElementById('contactCandidatId').value = candidatId;
+    document.getElementById('contactCandidatId').value  = candidatId;
     document.getElementById('contactDestinataire').value = `${nom} <${email}>`;
-    document.getElementById('contactObjet').value = 'Opportunité d\'emploi - CVMatch IA';
-    document.getElementById('contactMessage').value = `Bonjour ${nom},\n\nVotre profil a retenu notre attention lors d'une recherche sur CVMatch IA. Nous serions ravis d'échanger avec vous.\n\nCordialement,\n${<?= json_encode($user['nom']) ?>}`;
+    document.getElementById('contactObjet').value        = 'Opportunité d\'emploi - CVMatch IA';
+    document.getElementById('contactMessage').value      = `Bonjour ${nom},\n\nVotre profil a retenu notre attention lors d'une recherche sur CVMatch IA. Nous serions ravis d'échanger avec vous.\n\nCordialement,\n${<?= json_encode($user['nom']) ?>}`;
     document.getElementById('contactModal').classList.add('open');
 }
 
@@ -437,7 +615,6 @@ async function envoyerContact() {
     const candidatId = document.getElementById('contactCandidatId').value;
     const objet      = document.getElementById('contactObjet').value.trim();
     const message    = document.getElementById('contactMessage').value.trim();
-
     if (!objet || !message) { alert('Veuillez remplir l\'objet et le message.'); return; }
 
     try {
@@ -447,7 +624,6 @@ async function envoyerContact() {
             body: JSON.stringify({ candidat_id: candidatId, objet, message })
         });
         const data = await response.json();
-
         if (data.success) {
             closeModal();
             alert('Message envoyé avec succès ! (Simulé — voir logs/emails.log)');
@@ -465,27 +641,20 @@ async function envoyerContact() {
 function getInitiales(nom) {
     return nom.split(' ').slice(0,2).map(p => p[0]?.toUpperCase() || '').join('');
 }
-
 function scoreClass(score) {
     if (score >= 75) return 'score-high';
     if (score >= 50) return 'score-medium';
     return 'score-low';
 }
-
 function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = String(str || '');
     return div.innerHTML;
 }
-
 function useSuggestion(el) {
     document.getElementById('searchQuery').value = el.textContent;
 }
-
-function estimerTempsAnalyse(totalCvs) {
-    return 50;
-}
-
+function estimerTempsAnalyse(totalCvs) { return 50; }
 function formaterDuree(durationMs) {
     const seconds = Math.max(1, Math.round(durationMs / 1000));
     return seconds + ' seconde' + (seconds > 1 ? 's' : '');
@@ -496,7 +665,7 @@ document.getElementById('contactModal').addEventListener('click', function(e) {
     if (e.target === this) closeModal();
 });
 
-// Recherche au clic sur Entrée
+// Recherche au Enter
 document.getElementById('searchQuery').addEventListener('keypress', e => {
     if (e.key === 'Enter') rechercher();
 });
