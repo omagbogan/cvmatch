@@ -136,4 +136,4 @@ function startSession(): void {
 
 startSession();
 
-define('AGENT_SERVICE_URL', 'http://localhost:5001');
+define('AGENT_SERVICE_URL', env('AGENT_SERVICE_URL', 'http://localhost:5002'));

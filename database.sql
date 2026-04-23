@@ -17,6 +17,7 @@ CREATE TABLE users (
     telephone VARCHAR(20) DEFAULT NULL,
     ville VARCHAR(100) DEFAULT NULL,
     entreprise VARCHAR(200) DEFAULT NULL,
+    date_naissance DATE DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -46,6 +47,7 @@ CREATE TABLE recherches (
     id INT AUTO_INCREMENT PRIMARY KEY,
     recruteur_id INT NOT NULL,
     requete TEXT NOT NULL,
+    filtre VARCHAR(255) DEFAULT NULL,
     resultats_count INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (recruteur_id) REFERENCES users(id) ON DELETE CASCADE
@@ -67,11 +69,16 @@ CREATE TABLE contacts (
 );
 
 -- -----------------------------------------------
+-- Migration pour base existante (si déjà créée)
+-- -----------------------------------------------
+-- ALTER TABLE users ADD COLUMN date_naissance DATE DEFAULT NULL AFTER entreprise;
+
+-- -----------------------------------------------
 -- Comptes de démonstration
 -- Mot de passe pour tous : password123
 -- -----------------------------------------------
-INSERT INTO users (nom, email, password_hash, role, telephone, ville, entreprise) VALUES
-('Admin CVMatch',   'admin@cvmatch.ci',     '$2y$10$u1ZGDiOp9PNkH9DYEp/bm.EE2IHQ3LkBhivZ4wYp8kGZ1PQpzFRsq', 'admin',     '+225 07 00 00 00', 'Abidjan', 'CVMatch IA'),
-('Marie Recruteur', 'recruteur@cvmatch.ci', '$2y$10$u1ZGDiOp9PNkH9DYEp/bm.EE2IHQ3LkBhivZ4wYp8kGZ1PQpzFRsq', 'recruteur', '+225 07 11 22 33', 'Abidjan', 'TechCorp CI'),
-('Jean Dupont',     'jean@candidat.ci',     '$2y$10$u1ZGDiOp9PNkH9DYEp/bm.EE2IHQ3LkBhivZ4wYp8kGZ1PQpzFRsq', 'candidat',  '+225 05 44 55 66', 'Abidjan', NULL),
-('Fatou Koné',      'fatou@candidat.ci',    '$2y$10$u1ZGDiOp9PNkH9DYEp/bm.EE2IHQ3LkBhivZ4wYp8kGZ1PQpzFRsq', 'candidat',  '+225 07 77 88 99', 'Abidjan', NULL);
+INSERT INTO users (nom, email, password_hash, role, telephone, ville, entreprise, date_naissance) VALUES
+('Admin CVMatch',   'admin@cvmatch.ci',     '$2y$10$u1ZGDiOp9PNkH9DYEp/bm.EE2IHQ3LkBhivZ4wYp8kGZ1PQpzFRsq', 'admin',     '+225 07 00 00 00', 'Abidjan', 'CVMatch IA', NULL),
+('Marie Recruteur', 'recruteur@cvmatch.ci', '$2y$10$u1ZGDiOp9PNkH9DYEp/bm.EE2IHQ3LkBhivZ4wYp8kGZ1PQpzFRsq', 'recruteur', '+225 07 11 22 33', 'Abidjan', 'TechCorp CI', NULL),
+('Jean Dupont',     'jean@candidat.ci',     '$2y$10$u1ZGDiOp9PNkH9DYEp/bm.EE2IHQ3LkBhivZ4wYp8kGZ1PQpzFRsq', 'candidat',  '+225 05 44 55 66', 'Abidjan', NULL, '1995-03-15'),
+('Fatou Koné',      'fatou@candidat.ci',    '$2y$10$u1ZGDiOp9PNkH9DYEp/bm.EE2IHQ3LkBhivZ4wYp8kGZ1PQpzFRsq', 'candidat',  '+225 07 77 88 99', 'Abidjan', NULL, '1998-07-22');

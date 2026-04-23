@@ -3,6 +3,7 @@
  * api-match.php
  * Pont entre le dashboard recruteur et le microservice Python Flask.
  * Les candidats sont récupérés depuis MySQL et envoyés au Python.
+ * Inclut désormais : genre, date_naissance, age (calculé en PHP).
  */
 
 require_once __DIR__ . '/config.php';
@@ -14,7 +15,7 @@ set_time_limit(300);
 header('Content-Type: application/json');
 $requestStartedAt = microtime(true);
 
-// Lecture du body JSON envoyé par le dashboard
+// Lecture du body JSON
 $rawInput = file_get_contents('php://input');
 $body     = json_decode($rawInput, true);
 
@@ -31,19 +32,39 @@ $mode    = trim($body['mode']    ?? 'match');
 $endpoint = ($mode === 'chat') ? '/chat' : '/match';
 
 // --- Récupération des candidats depuis MySQL ---
+// Inclut genre et date_naissance pour enrichir le profil envoyé à Python
 $candidates = [];
 try {
     $db   = getDB();
     $stmt = $db->query(
-    "SELECT u.id, u.nom, u.email, u.telephone, u.ville,
-            c.id as cv_id, c.competences_extraites, c.annees_experience, 
-            c.fichier_stocke, c.texte_extrait, c.uploaded_at
-     FROM cvs c
-     JOIN users u ON u.id = c.user_id
-     WHERE u.role = 'candidat'
-     ORDER BY u.id, c.uploaded_at DESC"
-);
-$candidates = $stmt->fetchAll();
+        "SELECT u.id, u.nom, u.email, u.telephone, u.ville,
+                u.genre, u.date_naissance,
+                c.id as cv_id, c.competences_extraites, c.annees_experience,
+                c.fichier_stocke, c.texte_extrait, c.formation, c.uploaded_at
+         FROM cvs c
+         JOIN users u ON u.id = c.user_id
+         WHERE u.role = 'candidat'
+         ORDER BY u.id, c.uploaded_at DESC"
+    );
+    $rows = $stmt->fetchAll();
+
+    // Calcul de l'âge en PHP et ajout au tableau candidat
+    $now = new DateTime();
+    foreach ($rows as $row) {
+        $age = null;
+        if (!empty($row['date_naissance'])) {
+            try {
+                $dob = new DateTime($row['date_naissance']);
+                $age = (int)$now->diff($dob)->y;
+            } catch (Exception $e) {
+                $age = null;
+            }
+        }
+        $row['age'] = $age; // Ajout de l'âge calculé
+        unset($row['date_naissance']); // On envoie l'âge, pas la date brute (confidentialité)
+        $candidates[] = $row;
+    }
+
 } catch (Exception $e) {
     error_log('[api-match] Erreur récupération candidats : ' . $e->getMessage());
 }
@@ -52,7 +73,7 @@ $candidates = $stmt->fetchAll();
 $payload = json_encode([
     'requete'    => $requete,
     'filtre'     => $filtre,
-    'candidates' => $candidates, // on envoie les candidats directement
+    'candidates' => $candidates,
 ]);
 
 $estimatedSeconds = estimateAnalysisSeconds(count($candidates));
@@ -78,23 +99,22 @@ $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 $curlError = curl_error($ch);
 curl_close($ch);
 
-// Erreur de connexion
+// Erreur de connexion → fallback lexical
 if ($curlError || $response === false) {
-    // Fallback : scoring lexical PHP
     $results = fallbackScoring($candidates, $requete, $filtre);
     echo json_encode([
         'resultats' => $results,
-        'fallback' => true,
-        'meta' => [
-            'duration_ms' => elapsedMilliseconds($requestStartedAt),
+        'fallback'  => true,
+        'meta'      => [
+            'duration_ms'       => elapsedMilliseconds($requestStartedAt),
             'estimated_seconds' => $estimatedSeconds,
-            'candidate_count' => count($candidates),
+            'candidate_count'   => count($candidates),
         ],
     ]);
     exit;
 }
 
-// Erreur HTTP retournée par Python
+// Erreur HTTP
 if ($httpCode !== 200) {
     http_response_code($httpCode);
     echo json_encode([
@@ -105,7 +125,7 @@ if ($httpCode !== 200) {
     exit;
 }
 
-// Sauvegarder dans l'historique
+// Sauvegarde historique
 try {
     $user = getCurrentUser();
     $stmt = $db->prepare("INSERT INTO recherches (recruteur_id, requete, filtre, created_at) VALUES (?, ?, ?, NOW())");
@@ -117,9 +137,9 @@ try {
 $decodedResponse = json_decode($response, true);
 if (is_array($decodedResponse)) {
     $decodedResponse['meta'] = array_merge($decodedResponse['meta'] ?? [], [
-        'duration_ms' => elapsedMilliseconds($requestStartedAt),
+        'duration_ms'       => elapsedMilliseconds($requestStartedAt),
         'estimated_seconds' => $estimatedSeconds,
-        'candidate_count' => count($candidates),
+        'candidate_count'   => count($candidates),
     ]);
     echo json_encode($decodedResponse);
     exit;
@@ -133,10 +153,12 @@ function fallbackScoring(array $candidates, string $requete, string $filtre): ar
     $results = [];
     foreach ($candidates as $c) {
         $content = strtolower(implode(' ', [
-            $c['nom'] ?? '',
-            $c['ville'] ?? '',
+            $c['nom']                   ?? '',
+            $c['ville']                 ?? '',
+            $c['genre']                 ?? '',
             $c['competences_extraites'] ?? '',
-            $c['texte_extrait'] ?? '',
+            $c['texte_extrait']         ?? '',
+            $c['formation']             ?? '',
         ]));
         $matches = 0;
         foreach ($terms as $term) {
@@ -150,6 +172,8 @@ function fallbackScoring(array $candidates, string $requete, string $filtre): ar
                 'email'                 => $c['email'],
                 'telephone'             => $c['telephone'],
                 'ville'                 => $c['ville'],
+                'genre'                 => $c['genre'] ?? null,
+                'age'                   => $c['age']   ?? null,
                 'score'                 => $score,
                 'annees_experience'     => (int)($c['annees_experience'] ?? 0),
                 'competences_extraites' => $c['competences_extraites'],
@@ -163,10 +187,7 @@ function fallbackScoring(array $candidates, string $requete, string $filtre): ar
 }
 
 function estimateAnalysisSeconds(int $candidateCount): int {
-    if ($candidateCount <= 0) {
-        return 2;
-    }
-
+    if ($candidateCount <= 0) return 2;
     return max(2, min(60, (int) ceil(2 + ($candidateCount / 4))));
 }
 

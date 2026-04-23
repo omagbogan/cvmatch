@@ -9,44 +9,65 @@ if (isLoggedIn()) {
 
 $error   = '';
 $success = '';
-$tab     = 'candidat'; // onglet actif par défaut
+$tab     = 'candidat';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
         $error = 'Token de sécurité invalide.';
     } else {
-        $tab       = in_array($_POST['tab'] ?? '', ['candidat', 'recruteur']) ? $_POST['tab'] : 'candidat';
-        $nom       = trim($_POST['nom'] ?? '');
-        $email     = trim($_POST['email'] ?? '');
-        $password  = $_POST['password'] ?? '';
-        $telephone = trim($_POST['telephone'] ?? '');
-        $ville     = trim($_POST['ville'] ?? '');
-        $entreprise= trim($_POST['entreprise'] ?? '');
-        $role      = ($tab === 'recruteur') ? 'recruteur' : 'candidat';
+        $tab            = in_array($_POST['tab'] ?? '', ['candidat', 'recruteur']) ? $_POST['tab'] : 'candidat';
+        $nom            = trim($_POST['nom'] ?? '');
+        $email          = trim($_POST['email'] ?? '');
+        $password       = $_POST['password'] ?? '';
+        $telephone      = trim($_POST['telephone'] ?? '');
+        $ville          = trim($_POST['ville'] ?? '');
+        $entreprise     = trim($_POST['entreprise'] ?? '');
+        $date_naissance = trim($_POST['date_naissance'] ?? '');
+        $genre          = trim($_POST['genre'] ?? '');
+        $role           = ($tab === 'recruteur') ? 'recruteur' : 'candidat';
 
-        // Validations
+        // Validations communes
         if (empty($nom) || empty($email) || empty($password)) {
             $error = 'Veuillez remplir tous les champs obligatoires.';
         } elseif (!validateEmail($email)) {
             $error = 'Adresse email invalide.';
         } elseif (!validatePassword($password)) {
             $error = 'Le mot de passe doit contenir au moins 6 caractères.';
-        } else {
+        } elseif ($role === 'candidat' && empty($date_naissance)) {
+            $error = 'La date de naissance est obligatoire pour les candidats.';
+        } elseif ($role === 'candidat' && empty($genre)) {
+            $error = 'Le genre est obligatoire pour les candidats.';
+        } elseif ($role === 'candidat' && !in_array($genre, ['homme', 'femme'])) {
+            $error = 'Genre invalide.';
+        } elseif ($role === 'candidat' && !empty($date_naissance)) {
+            $d = DateTime::createFromFormat('Y-m-d', $date_naissance);
+            if (!$d || $d->format('Y-m-d') !== $date_naissance) {
+                $error = 'Date de naissance invalide.';
+            } elseif ($d > new DateTime()) {
+                $error = 'La date de naissance ne peut pas être dans le futur.';
+            } elseif ((new DateTime())->diff($d)->y < 16) {
+                $error = 'Vous devez avoir au moins 16 ans pour vous inscrire.';
+            }
+        }
+
+        if (!$error) {
             $db = getDB();
 
-            // Vérifier si l'email existe déjà
             $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
             $stmt->execute([$email]);
             if ($stmt->fetch()) {
                 $error = 'Cette adresse email est déjà utilisée.';
             } else {
-                $hash = password_hash($password, PASSWORD_BCRYPT);
+                $hash  = password_hash($password, PASSWORD_BCRYPT);
+                $dn    = ($role === 'candidat' && !empty($date_naissance)) ? $date_naissance : null;
+                $gen   = ($role === 'candidat' && !empty($genre)) ? $genre : null;
+
                 $stmt = $db->prepare("
-                    INSERT INTO users (nom, email, password_hash, role, telephone, ville, entreprise)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO users (nom, email, password_hash, role, telephone, ville, entreprise, date_naissance, genre)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$nom, $email, $hash, $role, $telephone, $ville, $entreprise ?: null]);
+                $stmt->execute([$nom, $email, $hash, $role, $telephone, $ville, $entreprise ?: null, $dn, $gen]);
 
                 flash('success', 'Compte créé avec succès ! Connectez-vous maintenant.');
                 header('Location: connexion.php');
@@ -77,8 +98,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .tab.active { background: #3b82f6; color: white; }
         .form-group { margin-bottom: 18px; }
         label { display: block; margin-bottom: 8px; font-weight: 500; color: #334155; font-size: 14px; }
-        input { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 14px; font-family: inherit; transition: border-color 0.2s; }
-        input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        input, select { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 14px; font-family: inherit; transition: border-color 0.2s; background: white; }
+        input:focus, select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
         .btn { width: 100%; padding: 14px; background: #3b82f6; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.2s; }
         .btn:hover { background: #2563eb; }
         .footer { text-align: center; margin-top: 20px; font-size: 14px; color: #64748b; }
@@ -92,6 +113,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .required { color: #ef4444; }
         .form-section { display: none; }
         .form-section.active { display: block; }
+        .field-hint { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+        .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     </style>
 </head>
 <body>
@@ -100,7 +123,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="back-link"><a href="index.php"><i class="fas fa-arrow-left"></i> Retour à l'accueil</a></div>
         <div class="logo"><span>CV</span><span>Match IA</span></div>
 
-        <!-- Onglets -->
         <div class="tabs">
             <button type="button" class="tab <?= $tab === 'candidat'  ? 'active' : '' ?>" onclick="switchTab('candidat')">👨‍💼 Candidat</button>
             <button type="button" class="tab <?= $tab === 'recruteur' ? 'active' : '' ?>" onclick="switchTab('recruteur')">🏢 Recruteur</button>
@@ -114,54 +136,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?= csrfField() ?>
             <input type="hidden" name="tab" id="tabInput" value="<?= clean($tab) ?>">
 
-            <!-- Formulaire Candidat -->
+            <!-- ===== Formulaire Candidat ===== -->
             <div class="form-section <?= $tab === 'candidat' ? 'active' : '' ?>" id="section-candidat">
+
                 <div class="form-group">
                     <label>Nom complet <span class="required">*</span></label>
                     <input type="text" name="nom" placeholder="Jean Dupont"
-                           value="<?= ($tab === 'candidat') ? clean($_POST['nom'] ?? '') : '' ?>" required <?= $tab !== 'candidat' ? 'disabled' : '' ?>>
+                           value="<?= ($tab === 'candidat') ? clean($_POST['nom'] ?? '') : '' ?>"
+                           required <?= $tab !== 'candidat' ? 'disabled' : '' ?>>
                 </div>
+
                 <div class="form-group">
                     <label>Email <span class="required">*</span></label>
                     <input type="email" name="email" placeholder="jean@email.ci"
-                           value="<?= ($tab === 'candidat') ? clean($_POST['email'] ?? '') : '' ?>" required <?= $tab !== 'candidat' ? 'disabled' : '' ?>>
+                           value="<?= ($tab === 'candidat') ? clean($_POST['email'] ?? '') : '' ?>"
+                           required <?= $tab !== 'candidat' ? 'disabled' : '' ?>>
                 </div>
+
                 <div class="form-group">
                     <label>Mot de passe <span class="required">*</span></label>
-                    <input type="password" name="password" placeholder="Minimum 6 caractères" minlength="6" required <?= $tab !== 'candidat' ? 'disabled' : '' ?>>
+                    <input type="password" name="password" placeholder="Minimum 6 caractères"
+                           minlength="6" required <?= $tab !== 'candidat' ? 'disabled' : '' ?>>
                 </div>
+
+                <!-- Date de naissance + Genre côte à côte -->
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label>Date de naissance <span class="required">*</span></label>
+                        <input type="date" name="date_naissance"
+                               value="<?= ($tab === 'candidat') ? clean($_POST['date_naissance'] ?? '') : '' ?>"
+                               max="<?= date('Y-m-d', strtotime('-16 years')) ?>"
+                               required <?= $tab !== 'candidat' ? 'disabled' : '' ?>>
+                        <p class="field-hint">Âge minimum : 16 ans.</p>
+                    </div>
+                    <div class="form-group">
+                        <label>Genre <span class="required">*</span></label>
+                        <select name="genre" required <?= $tab !== 'candidat' ? 'disabled' : '' ?>>
+                            <option value="">-- Sélectionner --</option>
+                            <option value="homme" <?= (($_POST['genre'] ?? '') === 'homme' && $tab === 'candidat') ? 'selected' : '' ?>>👨 Homme</option>
+                            <option value="femme" <?= (($_POST['genre'] ?? '') === 'femme' && $tab === 'candidat') ? 'selected' : '' ?>>👩 Femme</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label>Téléphone</label>
                     <input type="tel" name="telephone" placeholder="+225 07 XX XX XX"
-                           value="<?= ($tab === 'candidat') ? clean($_POST['telephone'] ?? '') : '' ?>" <?= $tab !== 'candidat' ? 'disabled' : '' ?>>
+                           value="<?= ($tab === 'candidat') ? clean($_POST['telephone'] ?? '') : '' ?>"
+                           <?= $tab !== 'candidat' ? 'disabled' : '' ?>>
                 </div>
+
                 <div class="form-group">
                     <label>Ville</label>
                     <input type="text" name="ville" placeholder="Abidjan"
-                           value="<?= ($tab === 'candidat') ? clean($_POST['ville'] ?? '') : '' ?>" <?= $tab !== 'candidat' ? 'disabled' : '' ?>>
+                           value="<?= ($tab === 'candidat') ? clean($_POST['ville'] ?? '') : '' ?>"
+                           <?= $tab !== 'candidat' ? 'disabled' : '' ?>>
                 </div>
             </div>
 
-            <!-- Formulaire Recruteur -->
+            <!-- ===== Formulaire Recruteur ===== -->
             <div class="form-section <?= $tab === 'recruteur' ? 'active' : '' ?>" id="section-recruteur">
+
                 <div class="form-group">
                     <label>Nom complet <span class="required">*</span></label>
                     <input type="text" name="nom" placeholder="Marie Martin"
-                           value="<?= ($tab === 'recruteur') ? clean($_POST['nom'] ?? '') : '' ?>" required <?= $tab !== 'recruteur' ? 'disabled' : '' ?>>
+                           value="<?= ($tab === 'recruteur') ? clean($_POST['nom'] ?? '') : '' ?>"
+                           required <?= $tab !== 'recruteur' ? 'disabled' : '' ?>>
                 </div>
+
                 <div class="form-group">
                     <label>Email <span class="required">*</span></label>
                     <input type="email" name="email" placeholder="marie@entreprise.ci"
-                           value="<?= ($tab === 'recruteur') ? clean($_POST['email'] ?? '') : '' ?>" required <?= $tab !== 'recruteur' ? 'disabled' : '' ?>>
+                           value="<?= ($tab === 'recruteur') ? clean($_POST['email'] ?? '') : '' ?>"
+                           required <?= $tab !== 'recruteur' ? 'disabled' : '' ?>>
                 </div>
+
                 <div class="form-group">
                     <label>Mot de passe <span class="required">*</span></label>
-                    <input type="password" name="password" placeholder="Minimum 6 caractères" minlength="6" required <?= $tab !== 'recruteur' ? 'disabled' : '' ?>>
+                    <input type="password" name="password" placeholder="Minimum 6 caractères"
+                           minlength="6" required <?= $tab !== 'recruteur' ? 'disabled' : '' ?>>
                 </div>
+
                 <div class="form-group">
                     <label>Nom de l'entreprise</label>
                     <input type="text" name="entreprise" placeholder="TechCorp CI"
-                           value="<?= ($tab === 'recruteur') ? clean($_POST['entreprise'] ?? '') : '' ?>" <?= $tab !== 'recruteur' ? 'disabled' : '' ?>>
+                           value="<?= ($tab === 'recruteur') ? clean($_POST['entreprise'] ?? '') : '' ?>"
+                           <?= $tab !== 'recruteur' ? 'disabled' : '' ?>>
                 </div>
             </div>
 
@@ -182,15 +242,16 @@ function switchTab(tab) {
     document.querySelector(`[onclick="switchTab('${tab}')"]`).classList.add('active');
     document.getElementById(`section-${tab}`).classList.add('active');
 
-    // Désactiver les champs de la section inactive pour éviter l'envoi de doublons
     document.querySelectorAll('.form-section').forEach(section => {
         const isActive = section.id === `section-${tab}`;
-        section.querySelectorAll('input').forEach(input => {
-            input.disabled = !isActive;
-            if (isActive && ['nom', 'email', 'password'].includes(input.name)) {
-                input.required = true;
+        section.querySelectorAll('input, select').forEach(el => {
+            el.disabled = !isActive;
+            if (isActive && ['nom', 'email', 'password'].includes(el.name)) {
+                el.required = true;
+            } else if (isActive && ['date_naissance', 'genre'].includes(el.name) && tab === 'candidat') {
+                el.required = true;
             } else if (!isActive) {
-                input.required = false;
+                el.required = false;
             }
         });
     });

@@ -12,7 +12,7 @@ $stmtH = $db->prepare("SELECT * FROM recherches WHERE recruteur_id = ? ORDER BY 
 $stmtH->execute([$user['id']]);
 $historique = $stmtH->fetchAll();
 
-// Statistiques globales (pour les admins et recruteurs)
+// Statistiques globales
 $stmtStats = $db->query("SELECT COUNT(*) as total FROM users WHERE role = 'candidat'");
 $totalCandidats = $stmtStats->fetch()['total'];
 
@@ -55,6 +55,7 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
         .filter-tag.active { background: var(--primary); color: white; }
         .candidate-card { background: white; border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; display: flex; gap: 1.25rem; border: 1px solid var(--gray-100); transition: all .2s; }
         .candidate-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .candidate-card.approx { border-left: 4px solid var(--warning); }
         .candidate-avatar { width: 70px; height: 70px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 1.25rem; flex-shrink: 0; }
         .candidate-info { flex: 1; }
         .candidate-name { font-size: 1.1rem; font-weight: 700; }
@@ -62,6 +63,7 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
         .score-high   { background: #d1fae5; color: #065f46; }
         .score-medium { background: #fed7aa; color: #9a3412; }
         .score-low    { background: #fee2e2; color: #991b1b; }
+        .badge-approx { display: inline-flex; align-items: center; gap: .3rem; background: #fef3c7; color: #92400e; border-radius: 20px; padding: .2rem .65rem; font-size: .7rem; font-weight: 700; margin-left: .4rem; }
         .skills-list { display: flex; flex-wrap: wrap; gap: .5rem; margin: .75rem 0; }
         .skill-tag { background: var(--gray-100); padding: .25rem .75rem; border-radius: 20px; font-size: .7rem; font-weight: 500; color: var(--gray-700); }
         .ai-summary { background: var(--gray-50); padding: .75rem 1rem; border-radius: 10px; font-size: .8rem; border-left: 3px solid var(--primary); margin: .75rem 0; color: var(--gray-700); line-height: 1.5; }
@@ -70,7 +72,36 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
         .btn-primary:hover { background: var(--primary-dark); }
         .btn-outline { background: transparent; border: 1px solid var(--gray-300); color: var(--gray-700); }
         .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
-        .btn-success { background: var(--success); color: white; }
+        .btn-warning { background: var(--warning); color: white; }
+        .btn-warning:hover { background: #d97706; }
+
+        /* ======= BANNIÈRE RÉSULTATS APPROXIMATIFS ======= */
+        #approxBanner {
+            display: none;
+            background: linear-gradient(135deg, #fffbeb, #fef3c7);
+            border: 1px solid #fcd34d;
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            animation: fadeIn .4s ease;
+        }
+        #approxBanner .approx-icon { font-size: 2.5rem; margin-bottom: .75rem; }
+        #approxBanner h3 { font-size: 1.1rem; font-weight: 700; color: #92400e; margin-bottom: .5rem; }
+        #approxBanner p { font-size: .875rem; color: #78350f; margin-bottom: 1.25rem; line-height: 1.6; }
+        #approxBanner .approx-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ======= SÉPARATEUR SECTION APPROXIMATIF ======= */
+        .section-separator {
+            display: flex; align-items: center; gap: 1rem;
+            margin: 1.5rem 0; color: var(--gray-500); font-size: .8rem; font-weight: 600;
+        }
+        .section-separator::before, .section-separator::after {
+            content: ''; flex: 1; height: 1px; background: var(--gray-200);
+        }
+
+        /* Modal */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,.5); z-index: 1000; justify-content: center; align-items: center; }
         .modal-overlay.open { display: flex; }
         .modal-content { background: white; border-radius: var(--radius); max-width: 520px; width: 90%; box-shadow: 0 25px 50px rgba(0,0,0,.15); }
@@ -86,64 +117,26 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
         .empty-state { text-align: center; padding: 3rem; color: var(--gray-500); }
         .empty-state i { font-size: 3rem; color: var(--gray-300); margin-bottom: 1rem; display: block; }
 
-        /* ====== CHAT FLOTTANT IA ====== */
-        #chatFloatBtn {
-            position: fixed; bottom: 2rem; right: 2rem;
-            width: 60px; height: 60px;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            border-radius: 50%; border: none; cursor: pointer;
-            box-shadow: 0 8px 25px rgba(59,130,246,.4);
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-size: 1.4rem; z-index: 9999;
-            transition: transform .2s, box-shadow .2s;
-        }
+        /* Chat flottant */
+        #chatFloatBtn { position: fixed; bottom: 2rem; right: 2rem; width: 60px; height: 60px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 50%; border: none; cursor: pointer; box-shadow: 0 8px 25px rgba(59,130,246,.4); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.4rem; z-index: 9999; transition: transform .2s, box-shadow .2s; }
         #chatFloatBtn:hover { transform: scale(1.1); box-shadow: 0 12px 30px rgba(59,130,246,.5); }
-        #chatFloatBtn .badge {
-            position: absolute; top: -4px; right: -4px;
-            background: #ef4444; color: white; border-radius: 50%;
-            width: 20px; height: 20px; font-size: .65rem;
-            display: none; align-items: center; justify-content: center; font-weight: 700;
-        }
-        #chatFloatWindow {
-            position: fixed; bottom: 6rem; right: 2rem;
-            width: 380px; max-height: 520px;
-            background: white; border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,.15);
-            display: none; flex-direction: column; z-index: 9998;
-            overflow: hidden; border: 1px solid var(--gray-200);
-        }
+        #chatFloatBtn .badge { position: absolute; top: -4px; right: -4px; background: #ef4444; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: .65rem; display: none; align-items: center; justify-content: center; font-weight: 700; }
+        #chatFloatWindow { position: fixed; bottom: 6rem; right: 2rem; width: 380px; max-height: 520px; background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,.15); display: none; flex-direction: column; z-index: 9998; overflow: hidden; border: 1px solid var(--gray-200); }
         #chatFloatWindow.open { display: flex; }
-        .chat-float-header {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            padding: 1rem 1.25rem; color: white;
-            display: flex; align-items: center; justify-content: space-between;
-        }
+        .chat-float-header { background: linear-gradient(135deg, var(--primary), var(--secondary)); padding: 1rem 1.25rem; color: white; display: flex; align-items: center; justify-content: space-between; }
         .agent-info { display: flex; align-items: center; gap: .75rem; }
-        .agent-avatar {
-            width: 36px; height: 36px; background: rgba(255,255,255,.2);
-            border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem;
-        }
+        .agent-avatar { width: 36px; height: 36px; background: rgba(255,255,255,.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
         .agent-name { font-weight: 700; font-size: .95rem; }
         .agent-status { font-size: .72rem; opacity: .85; }
         .chat-float-close { background: none; border: none; color: white; cursor: pointer; font-size: 1.1rem; opacity: .8; }
         .chat-float-close:hover { opacity: 1; }
-        .chat-float-messages {
-            flex: 1; overflow-y: auto; padding: 1rem;
-            display: flex; flex-direction: column; gap: .75rem; background: var(--gray-50);
-        }
+        .chat-float-messages { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .75rem; background: var(--gray-50); }
         .float-msg { display: flex; gap: .5rem; align-items: flex-end; }
         .float-msg.user { flex-direction: row-reverse; }
-        .float-msg-avatar {
-            width: 28px; height: 28px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: .7rem; font-weight: 700; flex-shrink: 0;
-        }
+        .float-msg-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .7rem; font-weight: 700; flex-shrink: 0; }
         .float-msg.ia .float-msg-avatar { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; }
         .float-msg.user .float-msg-avatar { background: var(--gray-200); color: var(--gray-700); }
-        .float-msg-bubble {
-            max-width: 75%; padding: .65rem .9rem;
-            border-radius: 14px; font-size: .82rem; line-height: 1.5;
-        }
+        .float-msg-bubble { max-width: 75%; padding: .65rem .9rem; border-radius: 14px; font-size: .82rem; line-height: 1.5; }
         .float-msg.ia .float-msg-bubble { background: white; border: 1px solid var(--gray-200); color: var(--gray-800); border-bottom-left-radius: 4px; }
         .float-msg.user .float-msg-bubble { background: var(--primary); color: white; border-bottom-right-radius: 4px; }
         .typing-indicator { display: flex; gap: 4px; padding: .65rem .9rem; }
@@ -151,40 +144,17 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
         .typing-indicator span:nth-child(2) { animation-delay: .2s; }
         .typing-indicator span:nth-child(3) { animation-delay: .4s; }
         @keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
-        .chat-float-suggestions {
-            padding: .5rem 1rem; display: flex; gap: .4rem; flex-wrap: wrap;
-            border-top: 1px solid var(--gray-100); background: white;
-        }
-        .chat-suggestion-chip {
-            padding: .3rem .7rem; background: var(--gray-100);
-            border-radius: 20px; font-size: .7rem; cursor: pointer;
-            border: none; font-family: inherit; color: var(--gray-700); transition: all .15s;
-        }
+        .chat-float-suggestions { padding: .5rem 1rem; display: flex; gap: .4rem; flex-wrap: wrap; border-top: 1px solid var(--gray-100); background: white; }
+        .chat-suggestion-chip { padding: .3rem .7rem; background: var(--gray-100); border-radius: 20px; font-size: .7rem; cursor: pointer; border: none; font-family: inherit; color: var(--gray-700); transition: all .15s; }
         .chat-suggestion-chip:hover { background: var(--primary); color: white; }
-        .chat-float-footer {
-            padding: .75rem 1rem; border-top: 1px solid var(--gray-200);
-            display: flex; gap: .5rem; background: white;
-        }
-        .chat-float-input {
-            flex: 1; padding: .65rem .9rem;
-            border: 1px solid var(--gray-200); border-radius: 20px;
-            font-family: inherit; font-size: .82rem; transition: border-color .2s;
-        }
+        .chat-float-footer { padding: .75rem 1rem; border-top: 1px solid var(--gray-200); display: flex; gap: .5rem; background: white; }
+        .chat-float-input { flex: 1; padding: .65rem .9rem; border: 1px solid var(--gray-200); border-radius: 20px; font-family: inherit; font-size: .82rem; transition: border-color .2s; }
         .chat-float-input:focus { outline: none; border-color: var(--primary); }
-        .chat-float-send {
-            width: 36px; height: 36px; background: var(--primary);
-            border: none; border-radius: 50%; color: white; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-            font-size: .85rem; transition: background .2s; flex-shrink: 0;
-        }
+        .chat-float-send { width: 36px; height: 36px; background: var(--primary); border: none; border-radius: 50%; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: .85rem; transition: background .2s; flex-shrink: 0; }
         .chat-float-send:hover { background: var(--primary-dark); }
         .chat-float-send:disabled { opacity: .5; cursor: not-allowed; }
 
-        @media (max-width: 768px) {
-            .candidate-card { flex-direction: column; }
-            .container { padding: 1rem; }
-            #chatFloatWindow { width: calc(100vw - 2rem); right: 1rem; }
-        }
+        @media (max-width: 768px) { .candidate-card { flex-direction: column; } .container { padding: 1rem; } #chatFloatWindow { width: calc(100vw - 2rem); right: 1rem; } #approxBanner .approx-actions { flex-direction: column; align-items: center; } }
     </style>
 </head>
 <body>
@@ -206,7 +176,7 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
         </div>
     <?php endif; ?>
 
-    <!-- Stats rapides -->
+    <!-- Stats -->
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-number" style="color:var(--primary);"><?= $totalCandidats ?></div>
@@ -222,7 +192,7 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
         </div>
     </div>
 
-    <!-- Barre de recherche IA -->
+    <!-- Barre de recherche -->
     <div class="card">
         <div class="card-header">
             <h2><i class="fas fa-robot" style="color:var(--primary);margin-right:.5rem;"></i> Recherche IA</h2>
@@ -239,16 +209,12 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
             <div id="analysisEstimate" style="margin-top:.75rem;font-size:.82rem;color:var(--gray-500);">
                 Estimation du temps d'analyse : environ 50 seconde(s).
             </div>
-
-            <!-- Filtres rapides -->
             <div class="filters-bar">
                 <button class="filter-tag active" onclick="setFilter(this, '')">Tous</button>
                 <button class="filter-tag" onclick="setFilter(this, 'high')">Score > 75%</button>
                 <button class="filter-tag" onclick="setFilter(this, 'abidjan')">Abidjan</button>
                 <button class="filter-tag" onclick="setFilter(this, 'exp5')">Exp. > 5 ans</button>
             </div>
-
-            <!-- Suggestions rapides -->
             <div style="margin-top:.75rem; font-size:.8rem; color:var(--gray-500);">
                 <strong>Suggestions :</strong>
                 <span class="suggestion" onclick="useSuggestion(this)" style="cursor:pointer;color:var(--primary);margin-left:.5rem;">Développeur web PHP MySQL</span> ·
@@ -258,7 +224,25 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
         </div>
     </div>
 
-    <!-- Résultats -->
+    <!-- ======= BANNIÈRE RÉSULTATS APPROXIMATIFS ======= -->
+    <div id="approxBanner">
+        <div class="approx-icon">🔍</div>
+        <h3>Aucun profil ne correspond exactement à votre recherche</h3>
+        <p id="approxBannerText">
+            Nous n'avons pas trouvé de candidats correspondant précisément à votre recherche.<br>
+            En revanche, nous avons <strong id="approxCount">0</strong> profil(s) qui s'en rapprochent.
+        </p>
+        <div class="approx-actions">
+            <button class="btn btn-warning" onclick="voirApproximatifs()">
+                <i class="fas fa-eye"></i> Oui, je veux les voir
+            </button>
+            <button class="btn btn-outline" onclick="nouvelleRecherche()">
+                <i class="fas fa-search"></i> Nouvelle recherche
+            </button>
+        </div>
+    </div>
+
+    <!-- Compteur et tri -->
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
         <span id="resultsCount" style="font-size:.875rem;color:var(--gray-500);font-weight:500;">
             Lancez une recherche pour voir les candidats
@@ -302,13 +286,11 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
     </div>
 </div>
 
-<!-- ====== BOUTON CHAT FLOTTANT ====== -->
+<!-- Chat flottant -->
 <button id="chatFloatBtn" onclick="toggleChatFloat()" title="Agent IA - Affinez votre recherche">
     <i class="fas fa-robot"></i>
     <span class="badge" id="chatBadge">1</span>
 </button>
-
-<!-- ====== FENÊTRE CHAT FLOTTANT ====== -->
 <div id="chatFloatWindow">
     <div class="chat-float-header">
         <div class="agent-info">
@@ -320,7 +302,6 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
         </div>
         <button class="chat-float-close" onclick="toggleChatFloat()">✕</button>
     </div>
-
     <div class="chat-float-messages" id="floatMessages">
         <div class="float-msg ia">
             <div class="float-msg-avatar">🤖</div>
@@ -328,19 +309,16 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
                 Bonjour ! Je suis votre assistant de recrutement IA.<br><br>
                 Faites d'abord une recherche, puis demandez-moi d'affiner. Par exemple :<br>
                 <em>"Seulement ceux avec +3 ans d'expérience"</em><br>
-                <em>"Score supérieur à 80%"</em><br>
-                <em>"Basé à Abidjan"</em>
+                <em>"Score supérieur à 80%"</em>
             </div>
         </div>
     </div>
-
     <div class="chat-float-suggestions">
         <button class="chat-suggestion-chip" onclick="useChip(this)">Score > 80%</button>
         <button class="chat-suggestion-chip" onclick="useChip(this)">+5 ans d'exp.</button>
         <button class="chat-suggestion-chip" onclick="useChip(this)">Basé à Abidjan</button>
         <button class="chat-suggestion-chip" onclick="useChip(this)">Trier par score</button>
     </div>
-
     <div class="chat-float-footer">
         <input type="text" id="floatInput" class="chat-float-input"
             placeholder="Affinez votre recherche..."
@@ -355,13 +333,19 @@ $totalCvs = $stmtStatsCv->fetch()['total'];
 // ============================================
 // Variables globales
 // ============================================
-let allResults    = [];
-let currentFilter = '';
+let allResults      = [];   // tous les résultats bruts de l'API
+let resultatsExacts = [];   // score >= 75
+let resultatsApprox = [];   // score 50-74
+let currentFilter   = '';
 let floatHistorique = [];
-const totalCvCount = <?= (int) $totalCvs ?>;
+const totalCvCount  = <?= (int) $totalCvs ?>;
+
+// Seuils de score
+const SCORE_EXACT = 75;   // score minimum pour un résultat "exact"
+const SCORE_APPROX = 50;  // score minimum pour un résultat "approximatif"
 
 // ============================================
-// Recherche IA via API PHP
+// Recherche IA
 // ============================================
 async function rechercher() {
     const query = document.getElementById('searchQuery').value.trim();
@@ -369,13 +353,19 @@ async function rechercher() {
 
     const btn = document.getElementById('searchBtn');
     const estimateEl = document.getElementById('analysisEstimate');
-    const estimatedSeconds = estimerTempsAnalyse(totalCvCount);
     const clientStartedAt = performance.now();
+
+    // Reset bannière approximatif
+    cacherBanniereApprox();
 
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Analyse en cours...';
-    estimateEl.textContent = `Analyse en cours... temps estimé : environ ${estimatedSeconds} seconde(s).`;
-    document.getElementById('resultsContainer').innerHTML = '<div class="empty-state"><span class="spinner" style="border-color:rgba(59,130,246,.3);border-top-color:var(--primary);"></span><p style="margin-top:1rem;">L\'IA analyse les CV...</p><p style="margin-top:.5rem;font-size:.82rem;color:var(--gray-500);">Temps estimé : environ ' + estimatedSeconds + ' seconde(s).</p></div>';
+    estimateEl.textContent = 'Analyse en cours... temps estimé : environ 50 seconde(s).';
+    document.getElementById('resultsContainer').innerHTML = `
+        <div class="empty-state">
+            <span class="spinner" style="border-color:rgba(59,130,246,.3);border-top-color:var(--primary);"></span>
+            <p style="margin-top:1rem;">L'IA analyse les CV...</p>
+        </div>`;
 
     try {
         const response = await fetch('api-match.php', {
@@ -387,32 +377,41 @@ async function rechercher() {
 
         if (data.error) {
             afficherErreur(data.error);
-            estimateEl.textContent = 'Analyse interrompue avant la fin.';
         } else {
             allResults = data.resultats || [];
-            afficherResultats(allResults);
+
+            // Séparer exacts et approximatifs
+            resultatsExacts = allResults.filter(r => r.score >= SCORE_EXACT);
+            resultatsApprox = allResults.filter(r => r.score >= SCORE_APPROX && r.score < SCORE_EXACT);
+
+            if (resultatsExacts.length === 0 && resultatsApprox.length > 0) {
+                // Aucun exact → proposer les approximatifs
+                afficherBanniereApprox(resultatsApprox.length, query);
+                document.getElementById('resultsContainer').innerHTML = '';
+                document.getElementById('resultsCount').textContent = 'Aucun profil exact trouvé';
+            } else if (resultatsExacts.length === 0 && resultatsApprox.length === 0) {
+                // Vraiment rien
+                afficherResultats([]);
+            } else {
+                // Des résultats exacts existent → les afficher normalement
+                afficherResultats(resultatsExacts);
+            }
+
             document.getElementById('sortSelect').disabled = false;
 
             const elapsedMs = Math.round(performance.now() - clientStartedAt);
-            const serverMs  = data.meta?.duration_ms || elapsedMs;
-            const estimated = data.meta?.estimated_seconds || estimatedSeconds;
-            const candidateCount = data.meta?.candidate_count;
-            const formatted = formaterDuree(serverMs);
+            const formatted = formaterDuree(data.meta?.duration_ms || elapsedMs);
+            const count     = data.meta?.candidate_count;
+            estimateEl.textContent = count
+                ? `Analyse terminée en ${formatted} pour ${count} CV(s).`
+                : `Analyse terminée en ${formatted}.`;
 
-            estimateEl.textContent = candidateCount
-                ? `Analyse terminée en ${formatted} pour ${candidateCount} CV(s). Estimation initiale : ${estimated} seconde(s).`
-                : `Analyse terminée en ${formatted}. Estimation initiale : ${estimated} seconde(s).`;
-
-            // Ouvrir le chat flottant automatiquement si des résultats
             if (allResults.length > 0) {
-                setTimeout(() => {
-                    document.getElementById('chatBadge').style.display = 'flex';
-                }, 500);
+                setTimeout(() => { document.getElementById('chatBadge').style.display = 'flex'; }, 500);
             }
         }
     } catch (err) {
         afficherErreur('Erreur de communication avec le service IA. Vérifiez que le microservice Python est actif.');
-        estimateEl.textContent = 'Impossible d\'afficher le temps réel : le service IA n\'a pas répondu.';
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-robot"></i> Analyser avec l\'IA';
@@ -420,31 +419,72 @@ async function rechercher() {
 }
 
 // ============================================
+// Bannière approximatifs
+// ============================================
+function afficherBanniereApprox(count, query) {
+    document.getElementById('approxCount').textContent = count;
+    document.getElementById('approxBannerText').innerHTML = `
+        Aucun candidat ne correspond précisément à <strong>"${escapeHtml(query)}"</strong>.<br>
+        En revanche, nous avons trouvé <strong>${count}</strong> profil(s) qui s'en rapprochent.
+    `;
+    document.getElementById('approxBanner').style.display = 'block';
+}
+
+function cacherBanniereApprox() {
+    document.getElementById('approxBanner').style.display = 'none';
+}
+
+function voirApproximatifs() {
+    cacherBanniereApprox();
+    afficherResultats(resultatsApprox, true); // true = mode approximatif
+    document.getElementById('resultsCount').textContent =
+        resultatsApprox.length + ' profil(s) approximatif(s) affiché(s)';
+}
+
+function nouvelleRecherche() {
+    cacherBanniereApprox();
+    document.getElementById('searchQuery').value = '';
+    document.getElementById('searchQuery').focus();
+    document.getElementById('resultsContainer').innerHTML = `
+        <div class="empty-state">
+            <i class="fas fa-search"></i>
+            <p>Entrez une nouvelle description du profil recherché.</p>
+        </div>`;
+    document.getElementById('resultsCount').textContent = 'Lancez une recherche pour voir les candidats';
+}
+
+// ============================================
 // Affichage des résultats
 // ============================================
-function afficherResultats(resultats) {
+function afficherResultats(resultats, isApprox = false) {
     const container = document.getElementById('resultsContainer');
     const count     = document.getElementById('resultsCount');
 
     if (!resultats || resultats.length === 0) {
-        container.innerHTML = '<div class="empty-state"><i class="fas fa-user-slash"></i><p>Aucun candidat trouvé pour cette recherche.<br>Essayez des termes plus généraux.</p></div>';
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-user-slash"></i>
+                <p>Aucun candidat trouvé pour cette recherche.<br>Essayez des termes plus généraux.</p>
+            </div>`;
         count.textContent = '0 candidat trouvé';
         return;
     }
 
-    count.textContent = resultats.length + ' candidat' + (resultats.length > 1 ? 's' : '') + ' trouvé' + (resultats.length > 1 ? 's' : '');
+    const label = isApprox ? ' profil(s) approximatif(s)' : ' candidat(s) trouvé(s)';
+    count.textContent = resultats.length + label;
 
     container.innerHTML = resultats.map(c => `
-        <div class="candidate-card">
+        <div class="candidate-card ${isApprox ? 'approx' : ''}">
             <div class="candidate-avatar">${getInitiales(c.nom)}</div>
             <div class="candidate-info">
                 <div style="display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;">
                     <span class="candidate-name">${escapeHtml(c.nom)}</span>
                     <span class="match-score ${scoreClass(c.score)}">${c.score}% match</span>
+                    ${isApprox ? '<span class="badge-approx"><i class="fas fa-adjust"></i> Approximatif</span>' : ''}
                     ${c.ville ? `<span style="font-size:.75rem;color:var(--gray-500);"><i class="fas fa-map-marker-alt"></i> ${escapeHtml(c.ville)}</span>` : ''}
                 </div>
                 <div style="font-size:.8rem;color:var(--gray-500);margin:.25rem 0;">
-                    ${c.email} · ${c.telephone || 'Tel non renseigné'}
+                    ${escapeHtml(c.email)} · ${escapeHtml(c.telephone || 'Tel non renseigné')}
                     ${c.annees_experience ? ` · ${c.annees_experience} an(s) d'expérience` : ''}
                 </div>
                 ${c.competences_extraites ? `
@@ -473,7 +513,7 @@ function afficherErreur(msg) {
 }
 
 // ============================================
-// Filtres
+// Filtres & tri
 // ============================================
 function setFilter(el, filter) {
     currentFilter = filter;
@@ -483,30 +523,31 @@ function setFilter(el, filter) {
 }
 
 function appliquerFiltre() {
-    let filtered = [...allResults];
+    let base = resultatsExacts.length > 0 ? resultatsExacts : resultatsApprox;
+    let filtered = [...base];
     if (currentFilter === 'high')    filtered = filtered.filter(c => c.score >= 75);
     if (currentFilter === 'abidjan') filtered = filtered.filter(c => (c.ville||'').toLowerCase().includes('abidjan'));
     if (currentFilter === 'exp5')    filtered = filtered.filter(c => (c.annees_experience||0) >= 5);
-    afficherResultats(filtered);
+    afficherResultats(filtered, resultatsExacts.length === 0);
 }
 
 function trierResultats() {
-    const sort   = document.getElementById('sortSelect').value;
-    const sorted = [...allResults].sort((a, b) => {
+    const sort = document.getElementById('sortSelect').value;
+    const base = resultatsExacts.length > 0 ? resultatsExacts : resultatsApprox;
+    const sorted = [...base].sort((a, b) => {
         if (sort === 'score')      return b.score - a.score;
         if (sort === 'name')       return a.nom.localeCompare(b.nom);
         if (sort === 'experience') return (b.annees_experience||0) - (a.annees_experience||0);
         return 0;
     });
-    afficherResultats(sorted);
+    afficherResultats(sorted, resultatsExacts.length === 0);
 }
 
 // ============================================
-// CHAT FLOTTANT — Agent IA DeepSeek (port 5001)
+// Chat flottant
 // ============================================
 function toggleChatFloat() {
-    const win = document.getElementById('chatFloatWindow');
-    win.classList.toggle('open');
+    document.getElementById('chatFloatWindow').classList.toggle('open');
     document.getElementById('chatBadge').style.display = 'none';
 }
 
@@ -530,93 +571,65 @@ function addFloatMsg(texte, type) {
 function showTyping() {
     const container = document.getElementById('floatMessages');
     const div = document.createElement('div');
-    div.className = 'float-msg ia';
-    div.id = 'typingEl';
-    div.innerHTML = `
-        <div class="float-msg-avatar">🤖</div>
-        <div class="float-msg-bubble typing-indicator"><span></span><span></span><span></span></div>
-    `;
+    div.className = 'float-msg ia'; div.id = 'typingEl';
+    div.innerHTML = `<div class="float-msg-avatar">🤖</div><div class="float-msg-bubble typing-indicator"><span></span><span></span><span></span></div>`;
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
 }
 
-function removeTyping() {
-    const el = document.getElementById('typingEl');
-    if (el) el.remove();
-}
+function removeTyping() { const el = document.getElementById('typingEl'); if (el) el.remove(); }
 
 async function envoyerFloatChat() {
     const input = document.getElementById('floatInput');
     const msg   = input.value.trim();
     if (!msg) return;
-
     if (allResults.length === 0) {
-        addFloatMsg("Veuillez d'abord lancer une recherche IA, puis je pourrai affiner les résultats pour vous.", 'ia');
+        addFloatMsg("Veuillez d'abord lancer une recherche IA.", 'ia');
         input.value = '';
         return;
     }
-
     input.value = '';
     addFloatMsg(msg, 'user');
     floatHistorique.push({ role: 'user', content: msg });
-
-    const sendBtn = document.getElementById('floatSendBtn');
-    sendBtn.disabled = true;
+    document.getElementById('floatSendBtn').disabled = true;
     showTyping();
-
     try {
         const response = await fetch('api-agent.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                message:           msg,
-                requete_initiale:  document.getElementById('searchQuery').value.trim(),
-                candidats:         allResults,
-                historique:        floatHistorique
-            })
+            body: JSON.stringify({ message: msg, requete_initiale: document.getElementById('searchQuery').value.trim(), candidats: allResults, historique: floatHistorique })
         });
-
         const data = await response.json();
         removeTyping();
-
-        if (data.resultats !== undefined) {
-            allResults = data.resultats;
-            afficherResultats(allResults);
-        }
-
+        if (data.resultats !== undefined) { allResults = data.resultats; afficherResultats(allResults); }
         const reponse = data.message || 'Résultats mis à jour.';
         addFloatMsg(reponse, 'ia');
         floatHistorique.push({ role: 'assistant', content: reponse });
-
     } catch (e) {
         removeTyping();
         addFloatMsg('Erreur de communication avec le service agent IA.', 'ia');
     }
-
-    sendBtn.disabled = false;
+    document.getElementById('floatSendBtn').disabled = false;
 }
 
 // ============================================
 // Modal Contact
 // ============================================
 function openModal(candidatId, nom, email) {
-    document.getElementById('contactCandidatId').value  = candidatId;
-    document.getElementById('contactDestinataire').value = `${nom} <${email}>`;
-    document.getElementById('contactObjet').value        = 'Opportunité d\'emploi - CVMatch IA';
-    document.getElementById('contactMessage').value      = `Bonjour ${nom},\n\nVotre profil a retenu notre attention lors d'une recherche sur CVMatch IA. Nous serions ravis d'échanger avec vous.\n\nCordialement,\n${<?= json_encode($user['nom']) ?>}`;
+    document.getElementById('contactCandidatId').value   = candidatId;
+    document.getElementById('contactDestinataire').value  = `${nom} <${email}>`;
+    document.getElementById('contactObjet').value         = "Opportunité d'emploi - CVMatch IA";
+    document.getElementById('contactMessage').value       = `Bonjour ${nom},\n\nVotre profil a retenu notre attention lors d'une recherche sur CVMatch IA. Nous serions ravis d'échanger avec vous.\n\nCordialement,\n<?= addslashes($user['nom']) ?>`;
     document.getElementById('contactModal').classList.add('open');
 }
 
-function closeModal() {
-    document.getElementById('contactModal').classList.remove('open');
-}
+function closeModal() { document.getElementById('contactModal').classList.remove('open'); }
 
 async function envoyerContact() {
     const candidatId = document.getElementById('contactCandidatId').value;
     const objet      = document.getElementById('contactObjet').value.trim();
     const message    = document.getElementById('contactMessage').value.trim();
     if (!objet || !message) { alert('Veuillez remplir l\'objet et le message.'); return; }
-
     try {
         const response = await fetch('api-contact.php', {
             method: 'POST',
@@ -624,51 +637,22 @@ async function envoyerContact() {
             body: JSON.stringify({ candidat_id: candidatId, objet, message })
         });
         const data = await response.json();
-        if (data.success) {
-            closeModal();
-            alert('Message envoyé avec succès ! (Simulé — voir logs/emails.log)');
-        } else {
-            alert('Erreur : ' + (data.error || 'Envoi échoué.'));
-        }
-    } catch (e) {
-        alert('Erreur de communication.');
-    }
+        if (data.success) { closeModal(); alert('Message envoyé avec succès !'); }
+        else { alert('Erreur : ' + (data.error || 'Envoi échoué.')); }
+    } catch (e) { alert('Erreur de communication.'); }
 }
 
 // ============================================
 // Utilitaires
 // ============================================
-function getInitiales(nom) {
-    return nom.split(' ').slice(0,2).map(p => p[0]?.toUpperCase() || '').join('');
-}
-function scoreClass(score) {
-    if (score >= 75) return 'score-high';
-    if (score >= 50) return 'score-medium';
-    return 'score-low';
-}
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = String(str || '');
-    return div.innerHTML;
-}
-function useSuggestion(el) {
-    document.getElementById('searchQuery').value = el.textContent;
-}
-function estimerTempsAnalyse(totalCvs) { return 50; }
-function formaterDuree(durationMs) {
-    const seconds = Math.max(1, Math.round(durationMs / 1000));
-    return seconds + ' seconde' + (seconds > 1 ? 's' : '');
-}
+function getInitiales(nom) { return nom.split(' ').slice(0,2).map(p => p[0]?.toUpperCase() || '').join(''); }
+function scoreClass(score) { if (score >= 75) return 'score-high'; if (score >= 50) return 'score-medium'; return 'score-low'; }
+function escapeHtml(str) { const div = document.createElement('div'); div.textContent = String(str || ''); return div.innerHTML; }
+function useSuggestion(el) { document.getElementById('searchQuery').value = el.textContent; }
+function formaterDuree(ms) { const s = Math.max(1, Math.round(ms/1000)); return s + ' seconde' + (s>1?'s':''); }
 
-// Fermer modal en cliquant dehors
-document.getElementById('contactModal').addEventListener('click', function(e) {
-    if (e.target === this) closeModal();
-});
-
-// Recherche au Enter
-document.getElementById('searchQuery').addEventListener('keypress', e => {
-    if (e.key === 'Enter') rechercher();
-});
+document.getElementById('contactModal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+document.getElementById('searchQuery').addEventListener('keypress', e => { if (e.key === 'Enter') rechercher(); });
 </script>
 </body>
 </html>
